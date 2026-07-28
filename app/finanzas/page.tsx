@@ -28,7 +28,6 @@ import {
   type FinanceMovement,
 } from "@/src/lib/finance/financeData";
 import { normalizeBankAccountForDbWeb } from "@/src/lib/finance/normalize";
-import { RealEstateSection } from "@/src/components/realEstate/RealEstateSection";
 import {
   applyMovementToAccounts,
   addDays,
@@ -76,10 +75,7 @@ export default function FinanzasPage() {
     notifyForecastLineDeleted,
     notifyFinanceMovementUpdated,
     notifyFinanceMovementDeleted,
-    modules,
   } = useSync();
-
-  const realEstateEnabled = modules.operaciones.enabled;
 
   // Data
   const [bankAccounts, setBankAccounts] = useState<BankAccountFull[]>([]);
@@ -1465,9 +1461,6 @@ export default function FinanzasPage() {
               </div>
             )}
           </section>
-
-            {/* ==================== INVERSIÓN INMOBILIARIA ==================== */}
-            {realEstateEnabled && <RealEstateSection />}
 
             {/* ==================== MOVIMIENTOS SECTION ==================== */}
             <section>

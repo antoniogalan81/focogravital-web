@@ -61,12 +61,6 @@ export const ENTITY_CONFIGS: Record<string, EntityConfig> = {
     getId: (item) => item.id,
     getUpdatedAt: (item) => item.updatedAt || new Date().toISOString(),
   },
-  realEstateOperations: {
-    tableName: "operaciones_inmobiliarias",
-    localKey: "realEstateOperations",
-    getId: (item) => item.id,
-    getUpdatedAt: (item) => item.updatedAt || new Date().toISOString(),
-  },
 };
 
 export type EntityKey = keyof typeof ENTITY_CONFIGS;

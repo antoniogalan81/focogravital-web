@@ -15,17 +15,6 @@ import {
 } from "./syncEngine";
 import { EntityKey, SyncableEntity, SupabaseRow } from "./types";
 import { type ForecastMonths } from "@/src/lib/finance/financeData";
-import type { REOperation } from "@/src/lib/realEstate";
-
-const APP_SETTINGS_ID = "__APP_SETTINGS__";
-
-interface ModulesConfig {
-  operaciones: { enabled: boolean };
-}
-
-const DEFAULT_MODULES: ModulesConfig = {
-  operaciones: { enabled: false },
-};
 
 // ==================== STORE TYPES ====================
 
@@ -63,7 +52,6 @@ interface SyncStore {
   bankAccounts: BankAccount[];
   incomeForecastLines: ForecastLine[];
   financeMovements: FinanceMovement[];
-  realEstateOperations: REOperation[];
 }
 
 interface SyncContextValue {
@@ -71,7 +59,6 @@ interface SyncContextValue {
   bankAccounts: BankAccount[];
   incomeForecastLines: ForecastLine[];
   financeMovements: FinanceMovement[];
-  realEstateOperations: REOperation[];
 
   // Actions
   setBankAccount: (item: BankAccount) => void;
@@ -80,8 +67,6 @@ interface SyncContextValue {
   deleteForecastLine: (id: string) => void;
   setFinanceMovement: (item: FinanceMovement) => void;
   deleteFinanceMovement: (id: string) => void;
-  setRealEstateOperation: (item: REOperation) => void;
-  deleteRealEstateOperation: (id: string) => void;
 
   // Silent notifications (no dirty, no push)
   notifyBankAccountUpdated: (item: BankAccount) => void;
@@ -90,10 +75,6 @@ interface SyncContextValue {
   notifyForecastLineDeleted: (id: string) => void;
   notifyFinanceMovementUpdated: (item: FinanceMovement) => void;
   notifyFinanceMovementDeleted: (id: string) => void;
-
-  // Modules (from app_settings, shared with APP)
-  modules: ModulesConfig;
-  setModuleEnabled: (module: keyof ModulesConfig, enabled: boolean) => Promise<void>;
 
   // Sync
   isSyncing: boolean;
@@ -112,12 +93,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     bankAccounts: [],
     incomeForecastLines: [],
     financeMovements: [],
-    realEstateOperations: [],
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [modules, setModules] = useState<ModulesConfig>(DEFAULT_MODULES);
 
   // Flag para evitar marcar dirty durante merge
   const isApplyingRemote = useRef(false);
@@ -151,52 +130,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ==================== APP SETTINGS (modules) ====================
-
-  useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      const { data } = await supabase
-        .from("app_settings")
-        .select("data")
-        .eq("user_id", userId)
-        .eq("id", APP_SETTINGS_ID)
-        .maybeSingle();
-      const remote = (data as any)?.data;
-      if (remote?.modules) {
-        setModules({
-          operaciones: { enabled: remote.modules.operaciones?.enabled === true },
-        });
-      }
-    })();
-  }, [userId]);
-
-  const setModuleEnabled = useCallback(async (module: keyof ModulesConfig, enabled: boolean) => {
-    if (!userId) return;
-    setModules((prev) => ({ ...prev, [module]: { enabled } }));
-
-    const { data: existing } = await supabase
-      .from("app_settings")
-      .select("data")
-      .eq("user_id", userId)
-      .eq("id", APP_SETTINGS_ID)
-      .maybeSingle();
-
-    const now = new Date().toISOString();
-    const base = (existing as any)?.data ?? {};
-    const currentModules = base.modules ?? {};
-    const updatedData = {
-      ...base,
-      modules: { ...currentModules, [module]: { enabled } },
-      updatedAt: now,
-    };
-
-    await supabase.from("app_settings").upsert(
-      { id: APP_SETTINGS_ID, user_id: userId, data: updatedData, client_updated_at: now },
-      { onConflict: "id" }
-    );
-  }, [userId]);
-
   // ==================== PULL ====================
 
   const doPull = useCallback(async () => {
@@ -211,8 +144,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       const storeIsEmpty =
         !storeRef.current.bankAccounts.length &&
         !storeRef.current.incomeForecastLines.length &&
-        !storeRef.current.financeMovements.length &&
-        !storeRef.current.realEstateOperations.length;
+        !storeRef.current.financeMovements.length;
       const { data, errors } = await pullAll(userId, storeIsEmpty);
 
       if (errors.length > 0) {
@@ -225,7 +157,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         bankAccounts: mergeRemoteRows(prev.bankAccounts, data.bankAccounts || [], "bankAccounts"),
         incomeForecastLines: mergeRemoteRows(prev.incomeForecastLines, data.incomeForecastLines || [], "incomeForecastLines"),
         financeMovements: mergeRemoteRows(prev.financeMovements, data.financeMovements || [], "financeMovements"),
-        realEstateOperations: mergeRemoteRows(prev.realEstateOperations, data.realEstateOperations || [], "realEstateOperations"),
       }));
 
       isApplyingRemote.current = false;
@@ -263,8 +194,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             item = currentStore.incomeForecastLines.find((x) => x.id === id);
           } else if (entityKey === "financeMovements") {
             item = currentStore.financeMovements.find((x) => x.id === id);
-          } else if (entityKey === "realEstateOperations") {
-            item = currentStore.realEstateOperations.find((x) => x.id === id);
           }
 
           console.log(`[Push] → ${entityKey}/${id}, item found: ${!!item}`);
@@ -464,45 +393,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     [schedulePush]
   );
 
-  const setRealEstateOperation = useCallback(
-    (item: REOperation) => {
-      const now = new Date().toISOString();
-      const updated = { ...item, updatedAt: item.updatedAt || now };
-
-      setStore((prev) => {
-        const exists = prev.realEstateOperations.find((x) => x.id === item.id);
-        if (exists) {
-          return {
-            ...prev,
-            realEstateOperations: prev.realEstateOperations.map((x) => (x.id === item.id ? updated : x)),
-          };
-        }
-        return { ...prev, realEstateOperations: [...prev.realEstateOperations, updated] };
-      });
-
-      if (!isApplyingRemote.current) {
-        markDirty("realEstateOperations", item.id);
-        schedulePush();
-      }
-    },
-    [schedulePush]
-  );
-
-  const deleteRealEstateOperation = useCallback(
-    (id: string) => {
-      setStore((prev) => ({
-        ...prev,
-        realEstateOperations: prev.realEstateOperations.filter((x) => x.id !== id),
-      }));
-
-      if (!isApplyingRemote.current) {
-        markDirty("realEstateOperations", id);
-        schedulePush();
-      }
-    },
-    [schedulePush]
-  );
-
   // ==================== SILENT NOTIFY (no dirty, no push) ====================
 
   const notifyBankAccountUpdated = useCallback((item: BankAccount) => {
@@ -562,36 +452,29 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     bankAccounts: store.bankAccounts,
     incomeForecastLines: store.incomeForecastLines,
     financeMovements: store.financeMovements,
-    realEstateOperations: store.realEstateOperations,
     setBankAccount,
     deleteBankAccount,
     setForecastLine,
     deleteForecastLine,
     setFinanceMovement,
     deleteFinanceMovement,
-    setRealEstateOperation,
-    deleteRealEstateOperation,
     notifyBankAccountUpdated,
     notifyBankAccountDeleted,
     notifyForecastLineUpdated,
     notifyForecastLineDeleted,
     notifyFinanceMovementUpdated,
     notifyFinanceMovementDeleted,
-    modules,
-    setModuleEnabled,
     isSyncing,
     lastSyncAt,
     lastError,
     triggerSync,
   }), [
-    store.bankAccounts, store.incomeForecastLines, store.financeMovements, store.realEstateOperations,
+    store.bankAccounts, store.incomeForecastLines, store.financeMovements,
     setBankAccount, deleteBankAccount, setForecastLine, deleteForecastLine,
     setFinanceMovement, deleteFinanceMovement,
-    setRealEstateOperation, deleteRealEstateOperation,
     notifyBankAccountUpdated, notifyBankAccountDeleted,
     notifyForecastLineUpdated, notifyForecastLineDeleted,
     notifyFinanceMovementUpdated, notifyFinanceMovementDeleted,
-    modules, setModuleEnabled,
     isSyncing, lastSyncAt, lastError, triggerSync,
   ]);
 
@@ -610,8 +493,8 @@ export function useSync() {
 
 // Hook opcional para componentes que solo necesitan datos
 export function useSyncData() {
-  const { bankAccounts, incomeForecastLines, financeMovements, realEstateOperations, isSyncing, lastSyncAt, lastError } =
+  const { bankAccounts, incomeForecastLines, financeMovements, isSyncing, lastSyncAt, lastError } =
     useSync();
-  return { bankAccounts, incomeForecastLines, financeMovements, realEstateOperations, isSyncing, lastSyncAt, lastError };
+  return { bankAccounts, incomeForecastLines, financeMovements, isSyncing, lastSyncAt, lastError };
 }
 
