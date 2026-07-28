@@ -12,7 +12,7 @@ import type { NextConfig } from "next";
  * ya publicados.
  */
 const APK_RELEASE_URL =
-  "https://github.com/antoniogalan81/focogravital-web/releases/download/v1.1/focogravital.apk";
+  "https://github.com/antoniogalan81/focogravital-web/releases/download/v1.0.1/focogravital.apk";
 
 const nextConfig: NextConfig = {
   async redirects() {
