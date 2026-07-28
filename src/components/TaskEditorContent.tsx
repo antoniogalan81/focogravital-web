@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import type { TaskRow, TaskData, BankAccount, ForecastLine, Label, UITaskType, TaskExtra, MultiItem, Meta } from "@/src/lib/types";
 import { getUIType, UI_TYPE_MAPPING } from "@/src/lib/types";
 import MetaParentSelector from "@/src/components/MetaParentSelector";
@@ -189,7 +189,16 @@ export default function TaskEditorContent({
 }: TaskEditorContentProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const miniInputRef = useRef<HTMLInputElement>(null);
+  const notaTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [miniDraft, setMiniDraft] = useState("");
+
+  // Auto-resize del textarea de notas al montar y cuando cambia el contenido
+  useEffect(() => {
+    const ta = notaTextareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }, [(editingData as TaskData).title, (editingData as TaskData).description]);
 
   // Derivar onlyLeafForecasts
   const parentIdsWithChildren = new Set<string>();
@@ -662,9 +671,9 @@ export default function TaskEditorContent({
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1">Contenido</label>
       <textarea
+        ref={notaTextareaRef}
         data-no-drag
         autoFocus
-        rows={6}
         value={(data.title || "") + (data.description !== undefined ? "\n" + data.description : "")}
         onChange={(e) => {
           const raw = e.target.value;
@@ -672,9 +681,12 @@ export default function TaskEditorContent({
           const newTitle = newlineIdx === -1 ? raw : raw.slice(0, newlineIdx);
           const newDescription = newlineIdx === -1 ? undefined : raw.slice(newlineIdx + 1);
           setEditingData(prev => ({ ...prev, title: newTitle, description: newDescription }));
+          e.target.style.height = "auto";
+          e.target.style.height = e.target.scrollHeight + "px";
           debouncedSave();
         }}
         placeholder="Escribe tu nota aquí..."
+        style={{ minHeight: "6rem", overflow: "hidden" }}
         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
       />
     </div>

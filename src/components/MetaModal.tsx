@@ -216,11 +216,6 @@ export default function MetaModal({ isOpen, meta, onClose, onSave, onDelete }: P
   const handleDelete = useCallback(async () => {
     if (!meta || !onDelete) return;
 
-    const confirmed = window.confirm(
-      "¿Eliminar esta meta y TODAS sus tareas asociadas? Esta acción no se puede deshacer."
-    );
-    if (!confirmed) return;
-
     setDeleting(true);
     setError(null);
 

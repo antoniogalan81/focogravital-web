@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Fragment, useMemo } from "react";
+import { useSync } from "@/src/sync/SyncContext";
 import { supabase } from "@/src/lib/supabaseClient";
 import { EditForecastAnualModal } from "@/src/components/finance/modals/EditForecastAnualModal";
 import { BankAccountModal } from "@/src/components/finance/modals/BankAccountModal";
@@ -19,6 +20,7 @@ import {
   generateLocalId,
   getMonthExpected,
   getMonthBase,
+  computeMonthReal,
   FIN_COLORS,
   getFinanceChipClass,
   type BankAccountFull,
@@ -26,6 +28,7 @@ import {
   type FinanceMovement,
 } from "@/src/lib/finance/financeData";
 import { normalizeBankAccountForDbWeb } from "@/src/lib/finance/normalize";
+import { RealEstateSection } from "@/src/components/realEstate/RealEstateSection";
 import {
   applyMovementToAccounts,
   addDays,
@@ -60,6 +63,23 @@ export default function FinanzasPage() {
     loading: true,
     authenticated: false,
   });
+
+  // SyncContext — in-memory cache survives navigation; eliminates refetch on re-visit
+  const {
+    bankAccounts: syncBankAccounts,
+    incomeForecastLines: syncForecastLines,
+    financeMovements: syncFinanceMovements,
+    lastSyncAt: syncLastSyncAt,
+    notifyBankAccountUpdated,
+    notifyBankAccountDeleted,
+    notifyForecastLineUpdated,
+    notifyForecastLineDeleted,
+    notifyFinanceMovementUpdated,
+    notifyFinanceMovementDeleted,
+    modules,
+  } = useSync();
+
+  const realEstateEnabled = modules.operaciones.enabled;
 
   // Data
   const [bankAccounts, setBankAccounts] = useState<BankAccountFull[]>([]);
@@ -135,16 +155,62 @@ export default function FinanzasPage() {
     })();
   }, []);
 
+  // ==================== SYNC CONTEXT → LOCAL STATE ====================
+  // Keep local state in sync with SyncContext so that changes from Agenda
+  // (task check), APP sync, or periodic pulls are immediately reflected.
+
+  // movements: new/deleted movements (e.g. financial task checked in Agenda)
+  useEffect(() => {
+    if (syncFinanceMovements.length === 0 && syncLastSyncAt === null) return;
+    setMovements(syncFinanceMovements as unknown as FinanceMovement[]);
+  }, [syncFinanceMovements, syncLastSyncAt]);
+
+  // forecastLines: APP may change variable flag, base, months — critical for computeMonthReal
+  useEffect(() => {
+    if (syncForecastLines.length === 0 && syncLastSyncAt === null) return; // not yet loaded
+    setForecastLines(
+      (syncForecastLines as unknown as Array<ForecastLineFull & { type?: string }>).map((fl) => ({
+        ...fl,
+        type: (fl.type === "GASTO" ? "GASTO" : "INGRESO") as "INGRESO" | "GASTO",
+      }))
+    );
+  }, [syncForecastLines, syncLastSyncAt]);
+
+  // bankAccounts: balance updates from Agenda (applyBalanceDelta) or APP
+  useEffect(() => {
+    if (syncBankAccounts.length === 0 && syncLastSyncAt === null) return;
+    setBankAccounts(syncBankAccounts as unknown as BankAccountFull[]);
+  }, [syncBankAccounts, syncLastSyncAt]);
+
   // Load data
   useEffect(() => {
     if (!authState.authenticated) return;
 
     const loadData = async () => {
       setLoadingData(true);
+
+      // Use SyncContext cache when available (0 Supabase queries on re-navigation).
+      // Require non-empty arrays so that an incremental pull that returned 0 new rows
+      // (store still empty) doesn't masquerade as "sync is ready with 0 items".
+      const syncReady =
+        syncLastSyncAt !== null &&
+        (syncBankAccounts.length > 0 ||
+          syncForecastLines.length > 0 ||
+          syncFinanceMovements.length > 0);
+      const accountsFetch = syncReady
+        ? Promise.resolve({ data: syncBankAccounts as BankAccountFull[] })
+        : fetchBankAccountsFull();
+      const forecastFetch = syncReady
+        ? Promise.resolve({ data: syncForecastLines as unknown as ForecastLineFull[] })
+        : fetchForecastLinesFull();
+      const movementsFetch = syncReady
+        ? Promise.resolve({ data: syncFinanceMovements as unknown as FinanceMovement[] })
+        : fetchMovements();
+
       const [accountsRes, forecastRes, movementsRes] = await Promise.all([
-        fetchBankAccountsFull(),
-        fetchForecastLinesFull(),
-        fetchMovements(),
+        accountsFetch,
+        forecastFetch,
+        movementsFetch,
       ]);
 
       setBankAccounts(accountsRes.data);
@@ -221,9 +287,10 @@ export default function FinanzasPage() {
       setBankAccounts((prev) =>
         prev.map((acc) => (acc.id === accountId ? { ...acc, balance: newBalance } : acc))
       );
+      if (existing) notifyBankAccountUpdated({ ...existing, balance: newBalance });
     }
     return result;
-  }, [bankAccounts]);
+  }, [bankAccounts, notifyBankAccountUpdated]);
 
   const handleSaveAccountName = useCallback(async (accountId: string, newName: string) => {
     const existing = bankAccounts.find((acc) => acc.id === accountId);
@@ -232,61 +299,119 @@ export default function FinanzasPage() {
       setBankAccounts((prev) =>
         prev.map((acc) => (acc.id === accountId ? { ...acc, name: newName } : acc))
       );
+      if (existing) notifyBankAccountUpdated({ ...existing, name: newName });
     }
     return result;
-  }, [bankAccounts]);
+  }, [bankAccounts, notifyBankAccountUpdated]);
 
   const handleSaveForecastPrev = useCallback(async (forecastId: string, type: "INGRESO" | "GASTO", newPrev: number) => {
-    const result = await updateForecastMonthPrev(forecastId, selectedMonthId, type, newPrev);
+    const existing = forecastLines.find((fl) => fl.id === forecastId);
+    const result = await updateForecastMonthPrev(forecastId, selectedMonthId, type, newPrev, existing);
     if (!result.error) {
-      setForecastLines((prev) =>
-        prev.map((fl) =>
-          fl.id === forecastId
-            ? {
-                ...fl,
-                months: {
-                  ...(fl.months || {}),
-                  [selectedMonthId]: {
-                    ...(fl.months?.[selectedMonthId] || {}),
-                    [type]: {
-                      ...(fl.months?.[selectedMonthId]?.[type] || {}),
-                      expected: newPrev,
+      if (existing) {
+        const updated: ForecastLineFull = {
+          ...existing,
+          months: {
+            ...(existing.months || {}),
+            [selectedMonthId]: {
+              ...(existing.months?.[selectedMonthId] || {}),
+              [type]: {
+                ...((existing.months?.[selectedMonthId]?.[type] as object) || {}),
+                expected: newPrev,
+              },
+            },
+          },
+        };
+        setForecastLines((prev) => prev.map((fl) => fl.id === forecastId ? updated : fl));
+        notifyForecastLineUpdated(updated);
+      } else {
+        setForecastLines((prev) =>
+          prev.map((fl) =>
+            fl.id === forecastId
+              ? {
+                  ...fl,
+                  months: {
+                    ...(fl.months || {}),
+                    [selectedMonthId]: {
+                      ...(fl.months?.[selectedMonthId] || {}),
+                      [type]: {
+                        ...(fl.months?.[selectedMonthId]?.[type] || {}),
+                        expected: newPrev,
+                      },
                     },
                   },
-                },
-              }
-            : fl
-        )
-      );
+                }
+              : fl
+          )
+        );
+      }
     }
     return result;
-  }, [selectedMonthId]);
+  }, [selectedMonthId, forecastLines, notifyForecastLineUpdated]);
 
   const handleSaveForecastReal = useCallback(async (forecastId: string, type: "INGRESO" | "GASTO", newBase: number) => {
-    const result = await updateForecastMonthBase(forecastId, selectedMonthId, type, newBase);
+    const existing = forecastLines.find((fl) => fl.id === forecastId);
+
+    // El usuario edita el valor REAL mostrado, que es base + Σmovimientos vinculados.
+    // Para que base + movimientos = valor introducido, almacenamos base = valor - movimientos.
+    const typeState = existing?.months?.[selectedMonthId]?.[type];
+    const isVariable = typeState ? typeState.variable !== false : true;
+    let adjustedBase = newBase;
+    if (isVariable) {
+      const cutoff = typeState?.cutoffISO ? new Date(typeState.cutoffISO) : null;
+      const movementSum = movements.reduce((sum, mv) => {
+        const linkedId = mv.linkedPredictionId ?? mv.forecastId ?? null;
+        if (linkedId !== forecastId) return sum;
+        if (mv.type !== type) return sum;
+        if (!mv.date || mv.date.slice(0, 7) !== selectedMonthId) return sum;
+        if (cutoff && new Date(mv.date) < cutoff) return sum;
+        return sum + mv.amount;
+      }, 0);
+      adjustedBase = newBase - movementSum;
+    }
+
+    const result = await updateForecastMonthBase(forecastId, selectedMonthId, type, adjustedBase, existing);
     if (!result.error) {
-      setForecastLines((prev) =>
-        prev.map((fl) =>
-          fl.id === forecastId
-            ? {
-                ...fl,
-                months: {
-                  ...(fl.months || {}),
-                  [selectedMonthId]: {
-                    ...(fl.months?.[selectedMonthId] || {}),
-                    [type]: {
-                      ...(fl.months?.[selectedMonthId]?.[type] || {}),
-                      base: newBase,
+      if (existing) {
+        const updated: ForecastLineFull = {
+          ...existing,
+          months: {
+            ...(existing.months || {}),
+            [selectedMonthId]: {
+              ...(existing.months?.[selectedMonthId] || {}),
+              [type]: {
+                ...((existing.months?.[selectedMonthId]?.[type] as object) || {}),
+                base: adjustedBase,
+              },
+            },
+          },
+        };
+        setForecastLines((prev) => prev.map((fl) => fl.id === forecastId ? updated : fl));
+        notifyForecastLineUpdated(updated);
+      } else {
+        setForecastLines((prev) =>
+          prev.map((fl) =>
+            fl.id === forecastId
+              ? {
+                  ...fl,
+                  months: {
+                    ...(fl.months || {}),
+                    [selectedMonthId]: {
+                      ...(fl.months?.[selectedMonthId] || {}),
+                      [type]: {
+                        ...(fl.months?.[selectedMonthId]?.[type] || {}),
+                        base: adjustedBase,
+                      },
                     },
                   },
-                },
-              }
-            : fl
-        )
-      );
+                }
+              : fl
+          )
+        );
+      }
     }
     return result;
-  }, [selectedMonthId]);
+  }, [selectedMonthId, forecastLines, movements, notifyForecastLineUpdated]);
 
   const openBankAccountModal = useCallback((mode: "create" | "edit", accountId?: string) => {
     setBankAccountModalMode(mode);
@@ -396,17 +521,20 @@ export default function FinanzasPage() {
 
   const handleAccountCreated = useCallback((account: BankAccountFull) => {
     setBankAccounts((prev) => [account, ...prev]);
-  }, []);
+    notifyBankAccountUpdated(account);
+  }, [notifyBankAccountUpdated]);
 
   const handleAccountUpdated = useCallback((account: BankAccountFull) => {
     setBankAccounts((prev) =>
       prev.map((acc) => (acc.id === account.id ? account : acc))
     );
-  }, []);
+    notifyBankAccountUpdated(account);
+  }, [notifyBankAccountUpdated]);
 
   const handleAccountDeleted = useCallback((accountId: string) => {
     setBankAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
-  }, []);
+    notifyBankAccountDeleted(accountId);
+  }, [notifyBankAccountDeleted]);
 
   const handleDeleteAccount = useCallback(async (accountId: string) => {
     const result = await deleteBankAccount(accountId);
@@ -445,7 +573,7 @@ export default function FinanzasPage() {
       return next;
     });
     
-    const result = await persistForecastLinesOrder(updates);
+    const result = await persistForecastLinesOrder(updates, forecastLines);
     if (result.error) {
       console.warn("Reorder forecast lines failed, reverting:", result.error);
       setForecastLines(prevLines);
@@ -543,6 +671,7 @@ export default function FinanzasPage() {
       if (movResult.error) {
         console.warn("Failed to persist movement:", movResult.error);
       }
+      notifyFinanceMovementUpdated(movement as unknown as Parameters<typeof notifyFinanceMovementUpdated>[0]);
 
       if (movement.accountId) {
         const acc = bankAccounts.find((a) => a.id === movement.accountId);
@@ -578,6 +707,7 @@ export default function FinanzasPage() {
       if (result.error) {
         console.warn("Failed to delete movement:", result.error);
       }
+      notifyFinanceMovementDeleted(movementId);
 
       if (mov.accountId) {
         const acc = bankAccounts.find((a) => a.id === mov.accountId);
@@ -632,17 +762,21 @@ export default function FinanzasPage() {
     const result = await upsertForecastLine(line);
     if (!result.error) {
       setForecastLines((prev) => prev.map((fl) => (fl.id === line.id ? line : fl)));
+      notifyForecastLineUpdated(line);
     }
     return result;
-  }, []);
+  }, [notifyForecastLineUpdated]);
 
   const handleDeleteForecastAnual = useCallback(async (lineId: string) => {
     const result = await deleteForecastLine(lineId);
     if (!result.error) {
+      const childIds = forecastLines.filter((fl) => fl.parentId === lineId).map((fl) => fl.id);
       setForecastLines((prev) => prev.filter((fl) => fl.id !== lineId && fl.parentId !== lineId));
+      notifyForecastLineDeleted(lineId);
+      childIds.forEach((id) => notifyForecastLineDeleted(id));
     }
     return result;
-  }, []);
+  }, [forecastLines, notifyForecastLineDeleted]);
 
   // ==================== RENDER ====================
 
@@ -1127,8 +1261,8 @@ export default function FinanzasPage() {
                               </td>
                             </tr>
                             {visibleItems.map((leaf) => {
-                              const realIng = getMonthBase(leaf, selectedMonthId, "INGRESO");
-                              const realGas = getMonthBase(leaf, selectedMonthId, "GASTO");
+                              const realIng = computeMonthReal(leaf, selectedMonthId, "INGRESO", movements);
+                              const realGas = computeMonthReal(leaf, selectedMonthId, "GASTO", movements);
                               const realTot = realIng - realGas;
                               const prevIng = getMonthExpected(leaf, selectedMonthId, "INGRESO");
                               const prevGas = getMonthExpected(leaf, selectedMonthId, "GASTO");
@@ -1284,8 +1418,8 @@ export default function FinanzasPage() {
                         effectiveLeafIdsMain.forEach((leafId) => {
                           const line = forecastLines.find((fl) => fl.id === leafId);
                           if (line) {
-                            totalRealIng += getMonthBase(line, selectedMonthId, "INGRESO");
-                            totalRealGas += getMonthBase(line, selectedMonthId, "GASTO");
+                            totalRealIng += computeMonthReal(line, selectedMonthId, "INGRESO", movements);
+                            totalRealGas += computeMonthReal(line, selectedMonthId, "GASTO", movements);
                             totalPrevIng += getMonthExpected(line, selectedMonthId, "INGRESO");
                             totalPrevGas += getMonthExpected(line, selectedMonthId, "GASTO");
                           }
@@ -1331,6 +1465,9 @@ export default function FinanzasPage() {
               </div>
             )}
           </section>
+
+            {/* ==================== INVERSIÓN INMOBILIARIA ==================== */}
+            {realEstateEnabled && <RealEstateSection />}
 
             {/* ==================== MOVIMIENTOS SECTION ==================== */}
             <section>
@@ -1468,6 +1605,7 @@ export default function FinanzasPage() {
         onClose={() => setIsForecastEditorOpen(false)}
         forecastLines={forecastLines}
         onForecastLinesChange={setForecastLines}
+        financeMovements={movements}
       />
 
       <SourceModal

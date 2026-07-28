@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useSync } from "@/src/sync/SyncContext";
 import { supabase } from "@/src/lib/supabaseClient";
 import type { TaskRow, TaskData, TaskFilters, FilterPreset, AgendaUIState, Meta, BankAccount, ForecastLine, Label, MultiItem } from "@/src/lib/types";
 import { DEFAULT_FILTERS, DEFAULT_UI_STATE } from "@/src/lib/types";
 import { 
   fetchTasks, fetchMetas, fetchBankAccounts, fetchForecastLines, fetchLabels,
-  createTask, updateTask, deleteTask, restoreTask, createMeta, updateMeta, deleteMetaAndTasks,
-  updateMetaOrder, updateMetaIsActive, filterTasks, sortTasksByHierarchy 
+  createTask, updateTask, deleteTask, restoreTask, createMeta, updateMeta, deleteMetaAndTasks, restoreMeta,
+  updateMetaOrder, updateMetaIsActive, filterTasks, sortTasksByHierarchy
 } from "@/src/lib/tasks";
 import { loadUIState, saveUIState, savePreset, deletePreset } from "@/src/lib/localStorage";
+import { upsertMovement, softDeleteMovement, applyAccountBalanceDelta } from "@/src/lib/finance/financeApi";
+import type { FinanceMovement } from "@/src/lib/finance/financeData";
 import AgendaSidebar from "@/src/components/AgendaSidebar";
 import TaskDiagramTree from "@/src/components/TaskDiagramTree";
 import MetaModal from "@/src/components/MetaModal";
@@ -58,6 +61,16 @@ type SaveMetaInput = {
 type AgendaView = "metas" | "agenda";
 
 export default function AgendaPage() {
+  // SyncContext — in-memory cache survives navigation; eliminates refetch on re-visit
+  const {
+    bankAccounts: syncBankAccounts,
+    incomeForecastLines: syncForecastLines,
+    lastSyncAt: syncLastSyncAt,
+    notifyFinanceMovementUpdated,
+    notifyFinanceMovementDeleted,
+    notifyBankAccountUpdated,
+  } = useSync();
+
   // Vista activa: desde URL (?view=agenda|metas) o default agenda
   const [activeView, setActiveView] = useState<AgendaView>("agenda");
   // Sincronizar con URL al montar/navegar (p.ej. desde SiteShell)
@@ -132,6 +145,11 @@ export default function AgendaPage() {
   // Task Editor Modal (para vista Agenda)
   const [taskEditorOpen, setTaskEditorOpen] = useState(false);
 
+  // Undo toast para eliminación de metas
+  const [metaUndoToast, setMetaUndoToast] = useState<{ metaId: string; metaTitle: string; expiresAt: number } | null>(null);
+  // Undo toast para eliminación de tareas en vista Agenda
+  const [agendaTaskUndoToast, setAgendaTaskUndoToast] = useState<{ taskId: string; expiresAt: number } | null>(null);
+
   // Sidebar espera solo {id, title}
   const metasForSidebar = useMemo(() => metas.map(m => ({ id: m.id, title: m.title })), [metas]);
   const metasForSidebarRef = useRef(metasForSidebar);
@@ -199,11 +217,22 @@ export default function AgendaPage() {
       setLoadingData(true);
       setError(null);
 
+      // Use SyncContext cache when available (0 Supabase queries on re-navigation).
+      // lastSyncAt !== null means SyncContext completed at least one pull — data is
+      // authoritative even if the arrays are empty.
+      const syncReady = syncLastSyncAt !== null;
+      const accountsFetch = syncReady
+        ? Promise.resolve({ data: syncBankAccounts as unknown as BankAccount[], error: null })
+        : fetchBankAccounts();
+      const forecastFetch = syncReady
+        ? Promise.resolve({ data: syncForecastLines as unknown as ForecastLine[], error: null })
+        : fetchForecastLines();
+
       const [tasksRes, metasRes, accountsRes, forecastRes, labelsRes] = await Promise.all([
         fetchTasks(),
         fetchMetas(),
-        fetchBankAccounts(),
-        fetchForecastLines(),
+        accountsFetch,
+        forecastFetch,
         fetchLabels(),
       ]);
 
@@ -223,6 +252,13 @@ export default function AgendaPage() {
 
     loadData();
   }, [authState.authenticated]);
+
+  // Keep local bankAccounts in sync when SyncContext pulls updates from other devices
+  useEffect(() => {
+    if (syncBankAccounts.length > 0) {
+      setBankAccounts(syncBankAccounts as unknown as BankAccount[]);
+    }
+  }, [syncBankAccounts]);
 
   // Auto-collapse sidebar on mobile (< 768px) on initial mount
   useEffect(() => {
@@ -334,8 +370,9 @@ export default function AgendaPage() {
       }
       return { success: true };
     }
-    // Tarea normal: actualizar en Supabase
-    const result = await updateTask(id, taskData);
+    // Tarea normal: actualizar en Supabase (existingTask evita el SELECT previo)
+    const existingTask = tasksRef.current.find(t => t.data.id === id);
+    const result = await updateTask(id, taskData, existingTask?.data);
     if (result.error) {
       return { success: false, error: result.error };
     }
@@ -344,6 +381,130 @@ export default function AgendaPage() {
     }
     return { success: true };
   }, []);
+
+  // Maneja el toggle de tareas financieras (INGRESO/GASTO).
+  // Para PUNTUAL: crea/elimina movimiento y ajusta balance.
+  // Para SEMANAL/MENSUAL: usa completedDates + movementIdsByDate (igual que la app móvil).
+  // Devuelve los campos que deben incluirse en el updateTask posterior.
+  const handleFinancialToggle = useCallback(async (
+    task: TaskRow,
+    newIsCompleted: boolean,
+    occurrenceISO?: string,
+  ): Promise<Partial<TaskData>> => {
+    const data = task.data;
+    const isFinancial = data.type === "INGRESO" || data.type === "GASTO";
+    const isRecurring = data.extra?.frequency === "SEMANAL" || data.extra?.frequency === "MENSUAL";
+    const amount = Math.abs(data.extra?.amountEUR ?? 0);
+
+    if (!isFinancial || amount <= 0) {
+      return { isCompleted: newIsCompleted };
+    }
+
+    // Aplica delta atómico al balance en Supabase via RPC (un solo UPDATE, sin race conditions).
+    // Actualiza el estado local con el nuevo balance que devuelve el servidor.
+    const applyBalanceDelta = async (delta: number) => {
+      if (!data.accountId) return;
+      const { newBalance, error } = await applyAccountBalanceDelta(data.accountId, delta);
+      if (error || newBalance === null) return;
+      const acc = (syncBankAccounts as unknown as BankAccount[]).find(a => a.id === data.accountId)
+        ?? bankAccounts.find(a => a.id === data.accountId);
+      if (!acc) return;
+      const updatedAcc = { ...acc, balance: newBalance };
+      setBankAccounts(prev => prev.map(a => a.id === data.accountId ? updatedAcc : a));
+      notifyBankAccountUpdated(updatedAcc as unknown as Parameters<typeof notifyBankAccountUpdated>[0]);
+    };
+
+    // ---- RECURRING (SEMANAL / MENSUAL) ----
+    // Misma lógica que toggleTaskCompleted en la app: completedDates + movementIdsByDate.
+    if (isRecurring) {
+      const today = occurrenceISO ?? new Date().toISOString().slice(0, 10);
+      const completedDates = [...(data.extra?.completedDates ?? [])];
+      const movementIdsByDate: Record<string, string> = { ...(data.extra?.movementIdsByDate ?? {}) };
+      const isAlreadyDone = completedDates.includes(today);
+
+      if (newIsCompleted && !isAlreadyDone) {
+        const movementId = crypto.randomUUID();
+        const movement: FinanceMovement = {
+          id: movementId,
+          date: today,
+          concept: data.title,
+          amount,
+          type: data.type as "INGRESO" | "GASTO",
+          accountId: data.accountId ?? null,
+          tags: data.label ? [data.label] : [],
+          label: data.label ?? null,
+          note: data.description ?? null,
+          frequency: "PUNTUAL",
+          linkedPredictionId: data.forecastId ?? null,
+          forecastId: data.forecastId ?? null,
+        };
+        await upsertMovement(movement);
+        notifyFinanceMovementUpdated(movement as unknown as Parameters<typeof notifyFinanceMovementUpdated>[0]);
+        const delta = data.type === "GASTO" ? -amount : amount;
+        await applyBalanceDelta(delta);
+        completedDates.push(today);
+        movementIdsByDate[today] = movementId;
+
+      } else if (!newIsCompleted && isAlreadyDone) {
+        const movementId = movementIdsByDate[today];
+        if (movementId) {
+          await softDeleteMovement(movementId);
+          notifyFinanceMovementDeleted(movementId);
+          const delta = data.type === "GASTO" ? amount : -amount;
+          await applyBalanceDelta(delta);
+        }
+        const idx = completedDates.indexOf(today);
+        if (idx >= 0) completedDates.splice(idx, 1);
+        delete movementIdsByDate[today];
+      }
+
+      const newExtra = {
+        ...data.extra,
+        completedDates: completedDates.length > 0 ? completedDates : undefined,
+        movementIdsByDate: Object.keys(movementIdsByDate).length > 0 ? movementIdsByDate : undefined,
+      };
+      return { extra: newExtra };
+    }
+
+    // ---- PUNTUAL ----
+    const extraFields: Partial<TaskData> = { isCompleted: newIsCompleted };
+
+    if (newIsCompleted && !data.movementId) {
+      const movementId = crypto.randomUUID();
+      const dateISO = (typeof data.date === "string" && data.date.length >= 10)
+        ? data.date.slice(0, 10)
+        : occurrenceISO ?? new Date().toISOString().slice(0, 10);
+
+      const movement: FinanceMovement = {
+        id: movementId,
+        date: dateISO,
+        concept: data.title,
+        amount,
+        type: data.type as "INGRESO" | "GASTO",
+        accountId: data.accountId ?? null,
+        tags: data.label ? [data.label] : [],
+        label: data.label ?? null,
+        note: data.description ?? null,
+        frequency: "PUNTUAL",
+        linkedPredictionId: data.forecastId ?? null,
+        forecastId: data.forecastId ?? null,
+      };
+      await upsertMovement(movement);
+      notifyFinanceMovementUpdated(movement as unknown as Parameters<typeof notifyFinanceMovementUpdated>[0]);
+      const delta = data.type === "GASTO" ? -amount : amount;
+      await applyBalanceDelta(delta);
+      extraFields.movementId = movementId;
+
+    } else if (!newIsCompleted && data.movementId) {
+      await softDeleteMovement(data.movementId);
+      notifyFinanceMovementDeleted(data.movementId);
+      const delta = data.type === "GASTO" ? amount : -amount;
+      await applyBalanceDelta(delta);
+      extraFields.movementId = null;
+    }
+
+    return extraFields;
+  }, [syncBankAccounts, bankAccounts, setBankAccounts, notifyFinanceMovementUpdated, notifyFinanceMovementDeleted, notifyBankAccountUpdated]);
 
   const handleDeleteTask = useCallback(async (id: string): Promise<{ success: boolean; error?: string }> => {
     const result = await deleteTask(id);
@@ -418,6 +579,7 @@ export default function AgendaPage() {
   }, [metaToEdit]);
 
   const handleDeleteMeta = useCallback(async (metaId: string): Promise<{ success: boolean; error?: string }> => {
+    const savedMeta = metas.find(m => m.id === metaId);
     const result = await deleteMetaAndTasks(metaId);
     if (!result.success) {
       return { success: false, error: result.error };
@@ -425,8 +587,83 @@ export default function AgendaPage() {
     // Eliminar de UI tras éxito en Supabase
     setMetas(prev => prev.filter(m => m.id !== metaId));
     setTasks(prev => prev.filter(t => t.data.metaId !== metaId));
+    // Mostrar toast de deshacer
+    if (savedMeta) {
+      setMetaUndoToast({ metaId, metaTitle: savedMeta.title, expiresAt: Date.now() + 5000 });
+    }
     return { success: true };
-  }, []);
+  }, [metas]);
+
+  // ========== UNDO DELETE META ==========
+
+  const handleUndoDeleteMeta = useCallback(async () => {
+    if (!metaUndoToast) return;
+    const { metaId } = metaUndoToast;
+    setMetaUndoToast(null);
+    const result = await restoreMeta(metaId);
+    if (!result.success) {
+      alert(`Error al restaurar meta: ${result.error || "Error desconocido"}`);
+      return;
+    }
+    // Recargar metas y tareas desde Supabase
+    const [metasRes, tasksRes] = await Promise.all([fetchMetas(), fetchTasks()]);
+    if (metasRes.data) setMetas(metasRes.data);
+    if (tasksRes.data) setTasks(tasksRes.data);
+  }, [metaUndoToast]);
+
+  // Auto-close toast de meta tras 5 segundos
+  useEffect(() => {
+    if (!metaUndoToast) return;
+    const remaining = metaUndoToast.expiresAt - Date.now();
+    if (remaining <= 0) { setMetaUndoToast(null); return; }
+    const timer = setTimeout(() => setMetaUndoToast(null), remaining);
+    return () => clearTimeout(timer);
+  }, [metaUndoToast]);
+
+  // Ctrl+Z para deshacer eliminación de meta (solo cuando el toast de meta es visible)
+  useEffect(() => {
+    if (!metaUndoToast) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        handleUndoDeleteMeta();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [metaUndoToast, handleUndoDeleteMeta]);
+
+  // ========== UNDO DELETE TASK (AGENDA VIEW) ==========
+
+  const handleUndoDeleteAgendaTask = useCallback(async () => {
+    if (!agendaTaskUndoToast) return;
+    const { taskId } = agendaTaskUndoToast;
+    setAgendaTaskUndoToast(null);
+    const result = await handleRestoreTask(taskId);
+    if (!result.success) {
+      alert(`Error al restaurar tarea: ${result.error || "Error desconocido"}`);
+    }
+  }, [agendaTaskUndoToast, handleRestoreTask]);
+
+  useEffect(() => {
+    if (!agendaTaskUndoToast) return;
+    const remaining = agendaTaskUndoToast.expiresAt - Date.now();
+    if (remaining <= 0) { setAgendaTaskUndoToast(null); return; }
+    const timer = setTimeout(() => setAgendaTaskUndoToast(null), remaining);
+    return () => clearTimeout(timer);
+  }, [agendaTaskUndoToast]);
+
+  useEffect(() => {
+    if (!agendaTaskUndoToast) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        handleUndoDeleteAgendaTask();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [agendaTaskUndoToast, handleUndoDeleteAgendaTask]);
 
   // ========== TOGGLE META ACTIVE ==========
 
@@ -553,8 +790,10 @@ export default function AgendaPage() {
 
   const softDeleteTask = useCallback(async (task: TaskRow) => {
     const taskId = task.data.id;
-    if (!confirm("¿Eliminar esta tarea?")) return;
-    await handleDeleteTask(taskId);
+    const result = await handleDeleteTask(taskId);
+    if (result.success) {
+      setAgendaTaskUndoToast({ taskId, expiresAt: Date.now() + 5000 });
+    }
   }, [handleDeleteTask]);
 
   const createRelativeTask = useCallback(async (position: "after" | "child", referenceTask: TaskRow) => {
@@ -590,6 +829,7 @@ export default function AgendaPage() {
       type: ref.type || "ACTIVIDAD",
       scope: ref.scope,
       title: "",
+      date: now.slice(0, 10),
       points: ref.points ?? 2,
       isCompleted: false,
       createdAt: now,
@@ -609,6 +849,41 @@ export default function AgendaPage() {
     taskEditor.startEdit(newTask);
     setTaskEditorOpen(true);
   }, [tasks, handleAddLocalDraft, taskEditor]);
+
+  const handleCreateNewTask = useCallback(() => {
+    const now = new Date().toISOString();
+    // Usar la meta activa en el filtro; si no hay filtro, la primera meta disponible
+    const filteredMetaIds = uiState.activeFilters.metaIds;
+    const targetMetaId = filteredMetaIds && filteredMetaIds.length > 0
+      ? filteredMetaIds[0]
+      : metas[0]?.id;
+    const maxOrder = tasks.length > 0 ? Math.max(...tasks.map(t => t.data.order ?? 0)) + 1000 : 1000;
+    const newTaskData: TaskData = {
+      id: crypto.randomUUID(),
+      metaId: targetMetaId,
+      parentId: null,
+      level: 0,
+      order: maxOrder,
+      type: "ACTIVIDAD",
+      scope: "LABORAL",
+      title: "",
+      date: now.slice(0, 10),
+      points: 2,
+      isCompleted: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    handleAddLocalDraft(newTaskData);
+    const newTask: TaskRow = {
+      id: newTaskData.id,
+      user_id: tasks[0]?.user_id ?? "",
+      data: newTaskData,
+      client_updated_at: now,
+      deleted_at: null,
+    };
+    taskEditor.startEdit(newTask);
+    setTaskEditorOpen(true);
+  }, [tasks, metas, uiState.activeFilters.metaIds, handleAddLocalDraft, taskEditor]);
 
   // ========== MULTI-ITEM HANDLERS ==========
 
@@ -715,7 +990,11 @@ export default function AgendaPage() {
     const metaIcon = meta?.icon?.trim() || "🎯";
     const metaColor = meta?.color && /^#[0-9A-Fa-f]{6}$/.test(meta.color) ? meta.color : null;
     const points = data.points ?? 2;
-    const isCompleted = data.isCompleted ?? false;
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const isRecurringTask = data.extra?.frequency === "SEMANAL" || data.extra?.frequency === "MENSUAL";
+    const isCompleted = isRecurringTask
+      ? (data.extra?.completedDates ?? []).includes(todayISO)
+      : (data.isCompleted ?? false);
     const isChildTask = !!data.parentId;
     const showPointsValue = isCompleted ? "✓" : ((uiState.activeFilters.hidePoints && !isChildTask) ? "" : points);
     const isMulti = data.type === "MULTI" && Array.isArray(data.multiItems) && data.multiItems.length > 0;
@@ -724,10 +1003,12 @@ export default function AgendaPage() {
 
     const handleToggleComplete = async (e: React.MouseEvent) => {
       e.stopPropagation();
-      await handleUpdateTask(taskId, { isCompleted: !isCompleted });
+      const newIsCompleted = !isCompleted; // isCompleted ya refleja completedDates para recurrentes
+      const extraFields = await handleFinancialToggle(task, newIsCompleted, todayISO);
+      await handleUpdateTask(taskId, extraFields);
       setTasks(prev => prev.map(t =>
         t.data.id === taskId
-          ? { ...t, data: { ...t.data, isCompleted: !isCompleted } }
+          ? { ...t, data: { ...t.data, ...extraFields } }
           : t
       ));
     };
@@ -1129,25 +1410,33 @@ export default function AgendaPage() {
             {/* Lista de tareas */}
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Info bar */}
-              <div className="shrink-0 h-7 flex items-center justify-between px-3 bg-slate-50 border-b border-slate-100">
-                <div className="text-[11px] text-slate-500">
-                  {loadingData ? (
-                    "Cargando..."
-                  ) : error ? (
-                    <span className="text-red-500">{error}</span>
-                  ) : (() => {
-                    // Contar excluyendo TITULO (coherente con la lista)
-                    const countForAgenda = filteredTasks.filter(t => t.data.kind !== "TITLE").length;
-                    const totalNonTitle = tasks.filter(t => t.data.kind !== "TITLE").length;
-                    return (
-                      <>
-                        {countForAgenda} tarea{countForAgenda !== 1 ? "s" : ""}
-                        {countForAgenda !== totalNonTitle && (
-                          <span className="text-slate-400"> (de {totalNonTitle})</span>
-                        )}
-                      </>
-                    );
-                  })()}
+              <div className="shrink-0 h-7 flex items-center px-3 bg-slate-50 border-b border-slate-100">
+                <div className="flex items-center justify-between w-full max-w-[720px]">
+                  <div className="text-[11px] text-slate-500">
+                    {loadingData ? (
+                      "Cargando..."
+                    ) : error ? (
+                      <span className="text-red-500">{error}</span>
+                    ) : (() => {
+                      // Contar excluyendo TITULO (coherente con la lista)
+                      const countForAgenda = filteredTasks.filter(t => t.data.kind !== "TITLE").length;
+                      const totalNonTitle = tasks.filter(t => t.data.kind !== "TITLE").length;
+                      return (
+                        <>
+                          {countForAgenda} tarea{countForAgenda !== 1 ? "s" : ""}
+                          {countForAgenda !== totalNonTitle && (
+                            <span className="text-slate-400"> (de {totalNonTitle})</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <button
+                    onClick={handleCreateNewTask}
+                    className="px-2 py-0.5 rounded text-xs font-medium text-blue-600 hover:bg-blue-50 border border-dashed border-blue-300"
+                  >
+                    + Tarea
+                  </button>
                 </div>
               </div>
 
@@ -1238,10 +1527,12 @@ export default function AgendaPage() {
                           // Handler para toggle complete (usando ID canónico data.id)
                           const handleToggleComplete = async (e: React.MouseEvent) => {
                             e.stopPropagation();
-                            await handleUpdateTask(taskId, { isCompleted: !isCompleted });
+                            const newIsCompleted = !isCompleted;
+                            const extraFields = await handleFinancialToggle(task, newIsCompleted);
+                            await handleUpdateTask(taskId, extraFields);
                             setTasks(prev => prev.map(t =>
                               t.data.id === taskId
-                                ? { ...t, data: { ...t.data, isCompleted: !isCompleted } }
+                                ? { ...t, data: { ...t.data, ...extraFields } }
                                 : t
                             ));
                           };
@@ -1334,12 +1625,10 @@ export default function AgendaPage() {
                             }
                           };
 
-                          // Handler para eliminar (SIN undo en Agenda)
+                          // Handler para eliminar
                           const handleDelete = async (e: React.MouseEvent) => {
                             e.stopPropagation();
-                            if (!confirm("¿Eliminar esta tarea?")) return;
-                            // Solo llamar a handleDeleteTask - ya hace setTasks internamente
-                            await handleDeleteTask(taskId);
+                            await softDeleteTask(task);
                           };
 
                           // Formatear fecha: "3 Feb"
@@ -1631,6 +1920,34 @@ export default function AgendaPage() {
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast de undo para eliminación de tarea (vista Agenda) */}
+      {agendaTaskUndoToast && (
+        <div className="fixed bottom-4 right-4 px-4 py-3 bg-orange-500 text-white text-sm rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <span>Tarea eliminada</span>
+          <button
+            onClick={handleUndoDeleteAgendaTask}
+            className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+          >
+            Deshacer
+          </button>
+          <span className="text-xs text-white/70">Ctrl+Z</span>
+        </div>
+      )}
+
+      {/* Toast de undo para eliminación de meta */}
+      {metaUndoToast && (
+        <div className="fixed bottom-4 right-4 px-4 py-3 bg-orange-500 text-white text-sm rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <span>Meta &quot;{metaUndoToast.metaTitle}&quot; eliminada</span>
+          <button
+            onClick={handleUndoDeleteMeta}
+            className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+          >
+            Deshacer
+          </button>
+          <span className="text-xs text-white/70">Ctrl+Z</span>
         </div>
       )}
     </div>

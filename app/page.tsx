@@ -1,7 +1,7 @@
 import Image from "next/image";
 import SiteShell from "@/components/SiteShell";
 
-const ANDROID_URL = "/ingravital.apk";
+const ANDROID_URL = "https://github.com/antoniogalan81/ingravital-web/releases/download/v1.0/ingravital.apk";
 
 export default function Home() {
   return (

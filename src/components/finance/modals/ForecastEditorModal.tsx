@@ -5,10 +5,11 @@ import {
   formatNumberES,
   parseEURInput,
   getMonthExpected,
-  getMonthBase,
+  computeMonthReal,
   getFinanceChipClass,
   FIN_COLORS,
   type ForecastLineFull,
+  type FinanceMovement,
 } from "@/src/lib/finance/financeData";
 import { updateForecastMonthPrev } from "@/src/lib/finance/financeApi";
 
@@ -19,6 +20,7 @@ interface ForecastEditorModalProps {
   onClose: () => void;
   forecastLines: ForecastLineFull[];
   onForecastLinesChange: React.Dispatch<React.SetStateAction<ForecastLineFull[]>>;
+  financeMovements: FinanceMovement[];
 }
 
 // ==================== FORECAST PREV CELL ====================
@@ -99,6 +101,7 @@ export function ForecastEditorModal({
   onClose,
   forecastLines,
   onForecastLinesChange,
+  financeMovements,
 }: ForecastEditorModalProps) {
   const [forecastEditorYear, setForecastEditorYear] = useState(() => new Date().getFullYear());
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
@@ -160,7 +163,7 @@ export function ForecastEditorModal({
   const computeReal = (lineId: string, monthId: string, type: "INGRESO" | "GASTO"): number => {
     const line = forecastLines.find((fl) => fl.id === lineId);
     if (!line) return 0;
-    return getMonthBase(line, monthId, type);
+    return computeMonthReal(line, monthId, type, financeMovements);
   };
 
   const getPrev = (line: ForecastLineFull, monthId: string, type: "INGRESO" | "GASTO"): number => {
