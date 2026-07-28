@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Brand
+
+This is **Focogravital** (goals / agenda / finance app). Canonical domain
+`https://focogravital.com`. It was published as *Ingravital* until July 2026 —
+that name only survives in `localStorage` keys, kept on purpose so existing
+users do not lose stored state. Do NOT rename those keys.
+
+Do not confuse this project with **Invergravital** (`invergravital.com`), the
+real-estate investment app, which lives in a different repository.
+
+Brand, domain, contact email and APK download live in `src/lib/site.ts`.
+
 ## Commands
 
 ```bash
@@ -29,6 +41,7 @@ No test suite is configured.
 - `src/lib/` — Business logic and utilities. `types.ts` is the canonical type definitions file. `finance/` sub-folder for finance-specific utilities.
 - `src/sync/` — Custom sync engine (pull/push against Supabase with dirty tracking and normalization).
 - `components/` (root) — `SiteShell.tsx`, the top-level layout shell.
+- `app/manifest.ts`, `app/robots.ts`, `app/sitemap.ts` — file-based metadata routes (PWA manifest, robots, sitemap).
 - `supabase/migrations/` — Database migration SQL files.
 
 ### Core domain model (`src/lib/types.ts`)

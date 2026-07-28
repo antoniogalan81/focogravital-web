@@ -8,6 +8,8 @@ import type { BankAccountFull, FinanceMovement } from "./financeData";
 export const DEFAULT_EXPENSE_CATEGORIES = ["Gasolina", "Comida", "Supermercado", "Alquiler", "Otro"];
 export const DEFAULT_INCOME_CATEGORIES = ["Sueldo", "Alquiler", "Bolsa"];
 
+// Clave heredada de la marca anterior. NO renombrar sin migración: guarda
+// categorías creadas por el usuario, renombrarla las haría desaparecer.
 const CUSTOM_CATEGORIES_KEY = "ingravital_custom_categories";
 
 export function loadCustomCategories(): { expense: string[]; income: string[] } {

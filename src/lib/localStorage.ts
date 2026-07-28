@@ -1,6 +1,8 @@
 import type { AgendaUIState, FilterPreset, TaskFilters } from "./types";
 import { DEFAULT_UI_STATE, DEFAULT_FILTERS } from "./types";
 
+// Clave heredada de la marca anterior. NO renombrar sin migración: contiene
+// estado de UI ya guardado en los navegadores de los usuarios.
 const STORAGE_KEY = "ingravital_agenda_ui";
 
 /**

@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# APK: se publica como release de GitHub, no se versiona
+public/*.apk

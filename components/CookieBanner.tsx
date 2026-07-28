@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+// Clave heredada de la marca anterior. NO renombrar: renombrarla haría que a
+// todos los usuarios existentes les reapareciera el banner de cookies.
 const STORAGE_KEY = "ingravital_cookie_consent";
 
 export default function CookieBanner() {

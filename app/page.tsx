@@ -1,7 +1,6 @@
 import Image from "next/image";
 import SiteShell from "@/components/SiteShell";
-
-const ANDROID_URL = "https://github.com/antoniogalan81/ingravital-web/releases/download/v1.0/ingravital.apk";
+import { ANDROID_APK_URL, APK_FILENAME, BRAND } from "@/src/lib/site";
 
 export default function Home() {
   return (
@@ -22,8 +21,8 @@ export default function Home() {
 
           <div className="mt-8">
             <a
-              href={ANDROID_URL}
-              download="ingravital.apk"
+              href={ANDROID_APK_URL}
+              download={APK_FILENAME}
               className="inline-block rounded-full bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
             >
               Descargar app para Android
@@ -40,7 +39,7 @@ export default function Home() {
           <div className="relative w-[320px] sm:w-[420px]">
             <Image
               src="/images/home/hero-iphone.png"
-              alt="Ingravital app en iPhone"
+              alt={`${BRAND} app en iPhone`}
               width={320}
               height={650}
               className="w-full h-auto"
@@ -125,7 +124,8 @@ export default function Home() {
         </p>
         <div className="mt-8">
           <a
-            href={ANDROID_URL}
+            href={ANDROID_APK_URL}
+            download={APK_FILENAME}
             className="inline-block rounded-full bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
           >
             Descargar app para Android

@@ -77,10 +77,12 @@ export default function LoginPage() {
     setForgotSuccess(false);
 
     try {
+      // Siempre el origen desde el que se pidió: funciona en focogravital.com,
+      // en el dominio antiguo durante la migración y en los previews.
       const redirectUrl = `${window.location.origin}/auth/reset`;
-      const { error: resetError } = 
+      const { error: resetError } =
       await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: "https://www.ingravital.com/auth/reset",
+        redirectTo: redirectUrl,
       });
 
       if (resetError) {
@@ -134,8 +136,8 @@ export default function LoginPage() {
       <header className="w-full border-b border-slate-100 bg-white">
         <div className="mx-auto max-w-[1140px] px-4 sm:px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="Ingravital" width={32} height={32} />
-            <span className="text-base font-semibold tracking-tight text-slate-900">Ingravital</span>
+            <Image src="/logo.png" alt="Focogravital" width={32} height={32} />
+            <span className="text-base font-semibold tracking-tight text-slate-900">Focogravital</span>
           </Link>
         </div>
       </header>

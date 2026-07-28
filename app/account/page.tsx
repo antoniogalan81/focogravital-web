@@ -385,10 +385,11 @@ export default function AccountPage() {
     setPasswordError(null);
 
     try {
+      // Mismo criterio que en /login: el origen real de la petición.
       const redirectUrl = `${window.location.origin}/auth/reset`;
-      
+
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: "https://www.ingravital.com/auth/reset",
+        redirectTo: redirectUrl,
       });
 
       if (error) {

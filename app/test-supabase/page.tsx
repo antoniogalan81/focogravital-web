@@ -11,7 +11,7 @@ type LeadRow = {
 
 export default function Page() {
   const [state, setState] = useState<any>({ loading: true });
-  const [email, setEmail] = useState("test+" + Date.now() + "@ingravital.dev");
+  const [email, setEmail] = useState("test+" + Date.now() + "@focogravital.dev");
   const [busy, setBusy] = useState(false);
 
   async function refresh() {

@@ -3,14 +3,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import HeaderAuth from "@/src/components/HeaderAuth";
 import CookieBanner from "@/components/CookieBanner";
+import { BRAND, CONTACT_EMAIL, WHATSAPP_URL } from "@/src/lib/site";
 
 type Props = {
   children: ReactNode;
   active?: "home" | "servicios" | "legal" | "agenda" | "metas" | "finanzas";
 };
-
-const WHATSAPP_URL = "https://wa.me/34656195880";
-const EMAIL = "contacto@ingravital.com";
 
 export default function SiteShell({ children, active }: Props) {
   return (
@@ -21,8 +19,8 @@ export default function SiteShell({ children, active }: Props) {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 shrink-0">
-              <Image src="/logo.png" alt="Ingravital" width={36} height={36} priority />
-              <span className="text-base font-semibold tracking-tight">Ingravital</span>
+              <Image src="/logo.png" alt={BRAND} width={36} height={36} priority />
+              <span className="text-base font-semibold tracking-tight">{BRAND}</span>
             </Link>
 
             {/* Nav center - hidden on mobile */}
@@ -138,13 +136,13 @@ export default function SiteShell({ children, active }: Props) {
       <footer className="border-t border-slate-100">
         <div className="mx-auto max-w-[1140px] px-4 sm:px-6 py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-slate-500">
-            <div>© 2026 Ingravital</div>
+            <div>© 2026 {BRAND}</div>
             <div className="flex flex-wrap items-center gap-4">
               <a className="hover:text-slate-900 transition-colors" href={WHATSAPP_URL}>
                 WhatsApp
               </a>
-              <a className="hover:text-slate-900 transition-colors" href={`mailto:${EMAIL}`}>
-                {EMAIL}
+              <a className="hover:text-slate-900 transition-colors" href={`mailto:${CONTACT_EMAIL}`}>
+                {CONTACT_EMAIL}
               </a>
               <Link className="hover:text-slate-900 transition-colors" href="/legal">
                 Legal

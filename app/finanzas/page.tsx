@@ -796,7 +796,7 @@ export default function FinanzasPage() {
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2 hover:opacity-80 shrink-0">
               <img src="/logo.png" alt="" className="w-6 h-6" />
-              <span className="hidden sm:inline font-semibold text-sm text-slate-800">Ingravital</span>
+              <span className="hidden sm:inline font-semibold text-sm text-slate-800">Focogravital</span>
             </a>
             <span className="hidden sm:inline text-slate-200">|</span>
             <div className="flex items-center bg-slate-100 rounded-lg p-0.5">

@@ -1234,7 +1234,7 @@ export default function AgendaPage() {
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-2 hover:opacity-80 shrink-0">
             <img src="/logo.png" alt="" className="w-6 h-6" />
-            <span className="hidden sm:inline font-semibold text-sm text-slate-800">Ingravital</span>
+            <span className="hidden sm:inline font-semibold text-sm text-slate-800">Focogravital</span>
           </a>
           <span className="hidden sm:inline text-slate-200">|</span>
           {/* Selector de vistas */}
