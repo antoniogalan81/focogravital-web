@@ -44,8 +44,8 @@ constante (o con `NEXT_PUBLIC_SITE_URL`); no hay literales repartidos.
 El APK **no** se versiona ni se sirve desde `public/` (pesa ~96 MB). Se publica
 como asset de release en GitHub y el sitio expone la URL estable
 `/focogravital.apk`, que redirige al release actual (ver `next.config.ts`).
-`/ingravital.apk` sigue redirigiendo ahí con un 301 para no romper enlaces
-antiguos.
+`/ingravital.apk` sigue redirigiendo ahí con un 308 (redirección permanente que
+conserva el método) para no romper enlaces antiguos.
 
 ## Claves de `localStorage`
 
