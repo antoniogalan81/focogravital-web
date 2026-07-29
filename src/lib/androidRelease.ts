@@ -13,8 +13,11 @@
  * (build 21, 2026-07-29), no de la configuración del proyecto.
  */
 
-/** Ruta estable y pública. Es la que se enlaza desde fuera (agalan.es incluido). */
-export const ANDROID_DOWNLOAD_PATH = "/download/android";
+/**
+ * Ruta estable y pública. Es la que se enlaza desde fuera (agalan.es incluido).
+ * `/download/android` se conserva como alias con 301 hacia aquí.
+ */
+export const ANDROID_DOWNLOAD_PATH = "/focogravital.apk";
 
 /** Asset real del release de GitHub al que redirige la ruta estable. */
 export const ANDROID_RELEASE_URL =
