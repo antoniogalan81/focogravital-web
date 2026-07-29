@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/src/lib/site";
 
-// Solo rutas públicas indexables. Agenda/metas/finanzas exigen sesión.
+// Solo rutas públicas indexables. Agenda y metas exigen sesión.
 const ROUTES = [
   "/",
   "/donaciones",

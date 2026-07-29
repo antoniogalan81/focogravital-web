@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from "react";
-import type { TaskRow, TaskData, TaskExtra, BankAccount, ForecastLine, Label, UITaskType, MultiItem, Meta } from "@/src/lib/types";
+import type { TaskRow, TaskData, TaskExtra, Label, UITaskType, MultiItem, Meta } from "@/src/lib/types";
 import { getUIType, UI_TYPE_MAPPING } from "@/src/lib/types";
 import MetaParentSelector from "@/src/components/MetaParentSelector";
 import { getReminderDisplay } from "@/src/lib/tasks";
@@ -112,8 +112,6 @@ function ensureScoringItemExists(category: "phys" | "know", label: string, initi
 
 interface TaskEditPanelProps {
   task: TaskRow;
-  bankAccounts: BankAccount[];
-  forecastLines: ForecastLine[];
   labels: Label[];
   onUpdateTask: (id: string, taskData: Partial<TaskData>) => Promise<{ success: boolean; error?: string }>;
   onDeleteTask: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -134,8 +132,6 @@ const UI_TYPES: UITaskType[] = ["Actividad", "Nota", "Fisico", "Conocimiento", "
 
 export default function TaskEditPanel({
   task,
-  bankAccounts,
-  forecastLines,
   labels,
   onUpdateTask,
   onDeleteTask,
@@ -313,31 +309,11 @@ export default function TaskEditPanel({
     });
   }, []);
 
-  // Derived: leaf forecasts
-  const onlyLeafForecasts = useMemo(() => {
-    const parentIds = new Set<string>();
-    forecastLines.forEach(f => { if (f.parentId) parentIds.add(f.parentId); });
-    return forecastLines.filter(f => !parentIds.has(f.id));
-  }, [forecastLines]);
-
-  // Forecast auto-redirect: if forecastId points to a parent, redirect to leaf
-  useEffect(() => {
-    const d = editingData as TaskData;
-    if (d.type !== "INGRESO" && d.type !== "GASTO") return;
-    if (!d.forecastId) return;
-    const parentIds = new Set<string>();
-    forecastLines.forEach(f => { if (f.parentId) parentIds.add(f.parentId); });
-    if (!parentIds.has(d.forecastId)) return;
-    const leafChild = onlyLeafForecasts.find(f => f.parentId === d.forecastId);
-    if (!leafChild) return;
-    updateField("forecastId", leafChild.id);
-  }, [editingData, forecastLines, onlyLeafForecasts, updateField]);
-
   // ==================== RENDER LOGIC (moved from renderEditPanel) ====================
 
   const data = editingData as TaskData;
   const currentUIType = getUIType(data.type, data.scope, data.kind);
-  const isFinance = data.type === "INGRESO" || data.type === "GASTO";
+  const hasAmount = data.type === "INGRESO" || data.type === "GASTO";
   const isPhysicalKnowledge = data.scope === "FISICO" || data.scope === "CRECIMIENTO";
   const isTitleTask = data.kind === "TITLE";
 
@@ -364,8 +340,6 @@ export default function TaskEditPanel({
         date: null,
         time: null,
         repeatRule: null,
-        accountId: null,
-        forecastId: null,
         label: undefined,
         description: undefined,
         isCompleted: false,
@@ -384,8 +358,6 @@ export default function TaskEditPanel({
         type: "NOTA",
         scope: null,
         label: undefined,
-        accountId: undefined,
-        forecastId: undefined,
         repeatRule: undefined,
         time: undefined,
         multiItems: undefined,
@@ -409,8 +381,6 @@ export default function TaskEditPanel({
         type: "MULTI",
         scope: null,
         label: undefined,
-        accountId: undefined,
-        forecastId: undefined,
         repeatRule: undefined,
         time: undefined,
         description: undefined,
@@ -441,8 +411,6 @@ export default function TaskEditPanel({
     }
 
     if (mapping.type !== "INGRESO" && mapping.type !== "GASTO") {
-      updates.accountId = undefined;
-      updates.forecastId = undefined;
       delete nextExtra.amountEUR;
     }
     
@@ -706,8 +674,8 @@ export default function TaskEditPanel({
     );
   };
 
-  const renderFinanceControls = () => {
-    const financeLeafs = onlyLeafForecasts;
+  // Controles para tareas de tipo INGRESO/GASTO: nombre e importe.
+  const renderAmountControls = () => {
     return (
       <div className="space-y-3">
         {/* Nombre + Cantidad */}
@@ -738,54 +706,6 @@ export default function TaskEditPanel({
               placeholder="0,00"
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-          </div>
-        </div>
-
-        {/* Cuenta y Previsión en fila */}
-        <div className="grid grid-cols-2 gap-3 items-start">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Cuenta</div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                data-no-drag
-                onClick={() => { updateField("accountId", undefined); }}
-                className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${!data.accountId ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-              >
-                Sin asociar
-              </button>
-              {bankAccounts.map(acc => (
-                <button
-                  key={acc.id}
-                  data-no-drag
-                  onClick={() => { updateField("accountId", acc.id); }}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${data.accountId === acc.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-                >
-                  {acc.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Previsión</div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                data-no-drag
-                onClick={() => { updateField("forecastId", undefined); }}
-                className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${!data.forecastId ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-              >
-                Sin asociar
-              </button>
-              {financeLeafs.map(f => (
-                <button
-                  key={f.id}
-                  data-no-drag
-                  onClick={() => { updateField("forecastId", f.id); }}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${data.forecastId === f.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -931,7 +851,7 @@ export default function TaskEditPanel({
             className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
           />
         </div>
-      ) : isMulti ? renderMultiControls() : isFinance ? renderFinanceControls() : renderPhysicalKnowledgeControls()}
+      ) : isMulti ? renderMultiControls() : hasAmount ? renderAmountControls() : renderPhysicalKnowledgeControls()}
 
       {/* Scheduling */}
       {!isTitleTask && !isMulti && (

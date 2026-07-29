@@ -70,8 +70,6 @@ export function createTaskActions(params: {
       date: refIsTitle ? getTodayISO() : ref.date,
       isTitle: false,
       unscheduled: refIsTitle ? false : isUnscheduled,
-      accountId: ref.accountId,
-      forecastId: ref.forecastId,
       amountEUR: ref.extra?.amountEUR,
     });
 
@@ -144,8 +142,6 @@ export function createTaskActions(params: {
       points: src.points ?? 2,
       isTitle,
       unscheduled: isUnscheduled,
-      accountId: src.accountId,
-      forecastId: src.forecastId,
       amountEUR: src.extra?.amountEUR,
       extraOverrides,
     });

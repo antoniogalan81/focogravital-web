@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import type { TaskRow, TaskData, BankAccount, ForecastLine, Label, UITaskType, TaskExtra, MultiItem, Meta } from "@/src/lib/types";
+import type { TaskRow, TaskData, Label, UITaskType, TaskExtra, MultiItem, Meta } from "@/src/lib/types";
 import { getUIType, UI_TYPE_MAPPING } from "@/src/lib/types";
 import MetaParentSelector from "@/src/components/MetaParentSelector";
 import { getReminderDisplay } from "@/src/lib/tasks";
@@ -149,8 +149,6 @@ export interface TaskEditorContentProps {
   cancelEdit: () => void;
   handleSaveAndClose: () => Promise<void>;
   // Datos externos
-  bankAccounts: BankAccount[];
-  forecastLines: ForecastLine[];
   ensureScoringItemExists?: (category: "phys" | "know", name: string, points: number) => Promise<unknown>;
   // Opcional: crear tarea (solo en Metas, no en Agenda)
   onCreateTask?: (position: "after" | "child", task: TaskRow) => void;
@@ -180,8 +178,6 @@ export default function TaskEditorContent({
   handleDeleteTask,
   cancelEdit,
   handleSaveAndClose,
-  bankAccounts,
-  forecastLines,
   ensureScoringItemExists,
   onCreateTask,
   metas,
@@ -200,16 +196,9 @@ export default function TaskEditorContent({
     ta.style.height = ta.scrollHeight + "px";
   }, [(editingData as TaskData).title, (editingData as TaskData).description]);
 
-  // Derivar onlyLeafForecasts
-  const parentIdsWithChildren = new Set<string>();
-  forecastLines.forEach(f => {
-    if (f.parentId) parentIdsWithChildren.add(f.parentId);
-  });
-  const onlyLeafForecasts = forecastLines.filter(f => !parentIdsWithChildren.has(f.id));
-
   const data = editingData as TaskData;
   const currentUIType = getUIType(data.type, data.scope, data.kind, data.extra);
-  const isFinance = data.type === "INGRESO" || data.type === "GASTO";
+  const hasAmount = data.type === "INGRESO" || data.type === "GASTO";
   const isPhysicalKnowledge = data.scope === "FISICO" || data.scope === "CRECIMIENTO";
   const isTitleTask = data.kind === "TITLE";
   const isMulti = currentUIType === "Multi";
@@ -238,8 +227,6 @@ export default function TaskEditorContent({
         date: null,
         time: null,
         repeatRule: null,
-        accountId: null,
-        forecastId: null,
         label: undefined,
         description: undefined,
         isCompleted: false,
@@ -264,8 +251,6 @@ export default function TaskEditorContent({
         type: "MULTI",
         scope: null,
         label: undefined,
-        accountId: undefined,
-        forecastId: undefined,
         repeatRule: undefined,
         time: undefined,
         description: undefined,
@@ -284,8 +269,6 @@ export default function TaskEditorContent({
         type: "NOTA",
         scope: null,
         label: undefined,
-        accountId: undefined,
-        forecastId: undefined,
         multiItems: undefined,
       };
       setEditingData(prev => ({ ...prev, ...notaUpdates }));
@@ -307,8 +290,6 @@ export default function TaskEditorContent({
     delete nextExtra.multiItems;
 
     if (mapping.type !== "INGRESO" && mapping.type !== "GASTO") {
-      updates.accountId = undefined;
-      updates.forecastId = undefined;
       delete nextExtra.amountEUR;
     }
     
@@ -574,9 +555,8 @@ export default function TaskEditorContent({
     );
   };
 
-  const renderFinanceControls = () => {
-    const financeLeafs = onlyLeafForecasts;
-
+  // Controles para tareas de tipo INGRESO/GASTO: nombre e importe.
+  const renderAmountControls = () => {
     // Handler para Enter/Tab en input de nombre
     const handleNameKeyDown = (e: React.KeyboardEvent) => {
       if (onCreateTask) {
@@ -612,54 +592,6 @@ export default function TaskEditorContent({
               placeholder="0,00"
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-          </div>
-        </div>
-
-        {/* Cuenta y Previsión en fila */}
-        <div className="grid grid-cols-2 gap-3 items-start">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Cuenta</div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                data-no-drag
-                onClick={() => { updateField("accountId", undefined); }}
-                className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${!data.accountId ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-              >
-                Sin asociar
-              </button>
-              {bankAccounts.map(acc => (
-                <button
-                  key={acc.id}
-                  data-no-drag
-                  onClick={() => { updateField("accountId", acc.id); }}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${data.accountId === acc.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-                >
-                  {acc.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Previsión</div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                data-no-drag
-                onClick={() => { updateField("forecastId", undefined); }}
-                className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${!data.forecastId ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-              >
-                Sin asociar
-              </button>
-              {financeLeafs.map(f => (
-                <button
-                  key={f.id}
-                  data-no-drag
-                  onClick={() => { updateField("forecastId", f.id); }}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${data.forecastId === f.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -1077,7 +1009,7 @@ export default function TaskEditorContent({
       {renderTypeChips()}
 
       {/* Controles según tipo */}
-      {isNota ? renderNotaControls() : isFinance ? renderFinanceControls() : isMulti ? renderMultiControls() : renderPhysicalKnowledgeControls()}
+      {isNota ? renderNotaControls() : hasAmount ? renderAmountControls() : isMulti ? renderMultiControls() : renderPhysicalKnowledgeControls()}
 
       {/* Scheduling: normal para no-Multi, simplificado para Multi */}
       {!isTitleTask && !isMulti && renderScheduling()}

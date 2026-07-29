@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Brand
 
-This is **Focogravital** (goals / agenda / finance app). Canonical domain
+This is **Focogravital** (goals / tasks / agenda app). Canonical domain
 `https://focogravital.com`. It was published as *Ingravital* until July 2026 —
 that name only survives in `localStorage` keys, kept on purpose so existing
 users do not lose stored state. Do NOT rename those keys.
@@ -33,12 +33,12 @@ No test suite is configured.
 
 ### Directory layout
 
-- `app/` — Next.js App Router pages and API routes. Pages are feature-named (`agenda`, `finanzas`, `account`, `auth/*`).
+- `app/` — Next.js App Router pages and API routes. Pages are feature-named (`agenda`, `account`, `auth/*`).
 - `app/api/` — Thin API routes (`tasks`, `leads`, `app-update`); all require Supabase bearer-token auth.
-- `src/components/` — Reusable React components, with sub-folders for `finance/` and `tasks/`.
+- `src/components/` — Reusable React components, with a `tasks/` sub-folder.
 - `src/contexts/` — React Context providers (`AuthContext`, and the sync `SyncContext`).
 - `src/hooks/` — Custom hooks (`useTaskEditor`, `useGlobalUi`).
-- `src/lib/` — Business logic and utilities. `types.ts` is the canonical type definitions file. `finance/` sub-folder for finance-specific utilities.
+- `src/lib/` — Business logic and utilities. `types.ts` is the canonical type definitions file.
 - `src/sync/` — Custom sync engine (pull/push against Supabase with dirty tracking and normalization).
 - `components/` (root) — `SiteShell.tsx`, the top-level layout shell.
 - `app/manifest.ts`, `app/robots.ts`, `app/sitemap.ts` — file-based metadata routes (PWA manifest, robots, sitemap).
@@ -46,9 +46,8 @@ No test suite is configured.
 
 ### Core domain model (`src/lib/types.ts`)
 
-- **TaskData** — tasks with type (`ACTIVIDAD`, `INGRESO`, `GASTO`, `MULTI`), scope (`LABORAL`, `FISICO`, `CRECIMIENTO`), status (`done`/`pending`/`hidden`), frequency (`PUNTUAL`, `SEMANAL`, `MENSUAL`), hierarchical parent-child relationships, and optional finance links.
+- **TaskData** — tasks with type (`ACTIVIDAD`, `INGRESO`, `GASTO`, `MULTI`), scope (`LABORAL`, `FISICO`, `CRECIMIENTO`), status (`done`/`pending`/`hidden`), frequency (`PUNTUAL`, `SEMANAL`, `MENSUAL`), and hierarchical parent-child relationships. `INGRESO`/`GASTO` are task types that carry an `amountEUR` the user types in; they are NOT a finance module.
 - **Meta** — goals with time horizons (`1M` → `10Y`).
-- **Finance entities** — `BankAccount`, `FinanceMovement`, `IncomeForecastLine`.
 
 ### Sync engine (`src/sync/`)
 
@@ -68,7 +67,7 @@ The sync engine handles offline-capable, multi-device data synchronization:
 
 ### UI language
 
-The application UI is in **Spanish**. Key terms: _Metas_ (goals), _Agenda_ (schedule), _Finanzas_ (finances), _Actividad/Físico/Crecimiento_ (task scopes).
+The application UI is in **Spanish**. Key terms: _Metas_ (goals), _Agenda_ (schedule), _Actividad/Físico/Crecimiento_ (task scopes).
 
 ### Styling
 

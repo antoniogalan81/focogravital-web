@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import type { TaskRow, TaskData, TaskFilters, TaskType, Meta, MetaRow, MetaData, BankAccount, ForecastLine, Label, TaskScope, TaskExtra } from "./types";
+import type { TaskRow, TaskData, TaskFilters, TaskType, Meta, MetaRow, MetaData, Label, TaskScope, TaskExtra } from "./types";
 import { SCORING_CATEGORY_TO_SCOPE, getUIType, SYSTEM_PUNTUAL_META_ID } from "./types";
 import { normalizeTaskForDb, hydrateTaskFromDb, recalculateTaskLevels } from "../sync/normalizeTask";
 import { normalizeMetaForDb, hydrateMetaFromDb } from "../sync/normalizeMeta";
@@ -583,67 +583,6 @@ export async function restoreMeta(metaId: string): Promise<{ success: boolean; e
   return { success: true };
 }
 
-// ==================== BANK ACCOUNTS ====================
-
-export async function fetchBankAccounts(): Promise<{ data: BankAccount[] | null; error: string | null }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) {
-    return { data: null, error: "No autenticado" };
-  }
-  const userId = session.user.id;
-
-  const { data, error } = await supabase
-    .from("bank_accounts")
-    .select("id, data, deleted_at, client_updated_at, server_updated_at")
-    .eq("user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) {
-    // Tabla puede no existir
-    console.warn("bank_accounts fetch error:", error.message);
-    return { data: [], error: null };
-  }
-
-  const accounts: BankAccount[] = (data || []).map((row: { id: string; data: { name?: string; title?: string; type?: string; balance?: number } }) => ({
-    id: row.id,
-    name: row.data?.name || row.data?.title || row.id,
-    type: row.data?.type as "PERSONAL" | "SOCIEDAD" | undefined,
-    balance: typeof row.data?.balance === "number" ? row.data.balance : undefined,
-  }));
-
-  return { data: accounts, error: null };
-}
-
-// ==================== FORECAST LINES ====================
-
-export async function fetchForecastLines(): Promise<{ data: ForecastLine[] | null; error: string | null }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) {
-    return { data: null, error: "No autenticado" };
-  }
-  const userId = session.user.id;
-
-  const { data, error } = await supabase
-    .from("income_forecast_lines")
-    .select("id, data")
-    .eq("user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) {
-    console.warn("income_forecast_lines fetch error:", error.message);
-    return { data: [], error: null };
-  }
-
-  const lines: ForecastLine[] = (data || []).map((row: { id: string; data: { name?: string; title?: string; type?: string; parentId?: string | null } }) => ({
-    id: row.id,
-    name: row.data?.name || row.data?.title || row.id,
-    type: (row.data?.type === "GASTO" ? "GASTO" : "INGRESO") as "INGRESO" | "GASTO",
-    parentId: row.data?.parentId || null,
-  }));
-
-  return { data: lines, error: null };
-}
-
 // ==================== SCORING SETTINGS (desde app_settings) ====================
 
 /**
@@ -699,12 +638,11 @@ export const fetchLabels = fetchScoringSettings;
 /**
  * Whitelist de campos de extra que son válidos para cada "categoría" de tarea.
  * - COMMON: campos compartidos entre todos los tipos (frecuencia, completedDates, etc.)
- * - FINANCIAL: campos exclusivos de INGRESO/GASTO
+ * - AMOUNT: importe, solo para tareas de tipo INGRESO/GASTO
  * - PHYSICAL_KNOWLEDGE: campos exclusivos de tareas físicas/conocimiento (scope FISICO/CRECIMIENTO)
  */
 const EXTRA_FIELDS_COMMON = [
   "completedDates",
-  "movementIdsByDate",
   "frequency",
   "weeklyDays",
   "weeklyTime",
@@ -714,7 +652,7 @@ const EXTRA_FIELDS_COMMON = [
   "notes",
 ];
 
-const EXTRA_FIELDS_FINANCIAL = ["amountEUR"];
+const EXTRA_FIELDS_AMOUNT = ["amountEUR"];
 
 const EXTRA_FIELDS_PHYSICAL_KNOWLEDGE = [
   "unit",
@@ -723,7 +661,8 @@ const EXTRA_FIELDS_PHYSICAL_KNOWLEDGE = [
   "knowledgeDetails",
 ];
 
-function isFinancialType(type: TaskType): boolean {
+/** Tipos de tarea que admiten importe. */
+function isAmountType(type: TaskType): boolean {
   return type === "INGRESO" || type === "GASTO";
 }
 
@@ -752,13 +691,13 @@ export function sanitizeTaskDataByType(
   }
 
   // Determinar categoría final
-  const isFinancial = nextType ? isFinancialType(nextType) : false;
+  const hasAmount = nextType ? isAmountType(nextType) : false;
   const isPhysOrKnow = isPhysicalOrKnowledgeScope(nextScope);
 
   // Construir whitelist de campos extra permitidos
   const allowedExtraFields = new Set<string>([
     ...EXTRA_FIELDS_COMMON,
-    ...(isFinancial ? EXTRA_FIELDS_FINANCIAL : []),
+    ...(hasAmount ? EXTRA_FIELDS_AMOUNT : []),
     ...(isPhysOrKnow ? EXTRA_FIELDS_PHYSICAL_KNOWLEDGE : []),
   ]);
 
@@ -780,16 +719,6 @@ export function sanitizeTaskDataByType(
 
   // Limpiar campos de data según tipo
   const result: TaskData | Partial<TaskData> = { ...next };
-
-  // Si no es financiero, limpiar accountId y forecastId
-  if (!isFinancial) {
-    if ("accountId" in result || prev?.accountId) {
-      result.accountId = undefined;
-    }
-    if ("forecastId" in result || prev?.forecastId) {
-      result.forecastId = undefined;
-    }
-  }
 
   // Si no es físico/conocimiento, limpiar label
   if (!isPhysOrKnow) {
@@ -1030,9 +959,6 @@ function getTodayISO(): string {
  * - time: null
  * - label: null (salvo override)
  * - parentId: null (salvo override)
- * - accountId: null
- * - forecastId: null
- * - movementId: null
  * - repeatRule: null
  * - isCompleted: false
  * - createdAt: now si no viene
@@ -1056,9 +982,7 @@ export interface BuildNewTaskOptions {
   points?: number;
   isTitle?: boolean;
   unscheduled?: boolean;
-  // Campos financieros (para herencia en duplicados)
-  accountId?: string | null;
-  forecastId?: string | null;
+  // Importe heredado al duplicar tareas de tipo INGRESO/GASTO
   amountEUR?: number;
   // Campos extra adicionales a preservar
   extraOverrides?: Partial<TaskExtra>;
@@ -1079,7 +1003,7 @@ export function buildNewTaskData(options: BuildNewTaskOptions): TaskData {
     extra.unscheduled = true;
   }
 
-  // Si es tarea financiera con amountEUR, preservarlo
+  // Tareas INGRESO/GASTO: preservar el importe
   if (options.amountEUR !== undefined && options.amountEUR > 0) {
     extra.amountEUR = options.amountEUR;
   }
@@ -1116,9 +1040,6 @@ export function buildNewTaskData(options: BuildNewTaskOptions): TaskData {
       time: null,
       repeatRule: null,
       points: 0,
-      accountId: null,
-      forecastId: null,
-      movementId: null,
       isCompleted: false,
       createdAt: now,
       updatedAt: now,
@@ -1143,9 +1064,6 @@ export function buildNewTaskData(options: BuildNewTaskOptions): TaskData {
     time: null,
     repeatRule: null,
     points: options.points ?? 2,
-    accountId: options.accountId ?? null,
-    forecastId: options.forecastId ?? null,
-    movementId: null,
     isCompleted: false,
     createdAt: now,
     updatedAt: now,
@@ -1191,8 +1109,6 @@ export function createTaskFromTemplate(template: TaskData): TaskData {
     points: template.points ?? 2,
     isTitle,
     unscheduled: isUnscheduled,
-    accountId: template.accountId,
-    forecastId: template.forecastId,
     amountEUR: template.extra?.amountEUR,
     extraOverrides,
   });

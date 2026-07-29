@@ -7,7 +7,6 @@ export type Frequency = "PUNTUAL" | "SEMANAL" | "MENSUAL";
 
 export interface TaskExtra {
   completedDates?: string[];
-  movementIdsByDate?: Record<string, string>;
   // Frecuencia y repetición
   frequency?: Frequency;
   weeklyDays?: string[];        // "L", "M", "X", "J", "V", "S", "D" (formato móvil)
@@ -19,8 +18,9 @@ export interface TaskExtra {
   reminderEnabled?: boolean;           // true si hay aviso activo
   reminderOffsetUnit?: "min" | "hor";  // unidad del offset (minutos u horas)
   reminderOffsetValue?: number;        // valor del offset (ej: 5 para "5 min antes")
-  // Campos financieros
-  amountEUR?: number;           // Importe para INGRESO/GASTO
+  // Importe que el usuario anota en tareas de tipo INGRESO/GASTO.
+  // Es un dato de la tarea, no del desaparecido módulo de finanzas.
+  amountEUR?: number;
   // Campos físicos/conocimiento
   unit?: "min" | "h" | "km" | "kg" | "hor";
   quantity?: number;
@@ -56,9 +56,6 @@ export interface TaskData {
   repeatRule?: string | null;   // RRULE para repeticiones (formato app móvil)
   points?: number;              // Default 2
   isCompleted?: boolean;
-  accountId?: string | null;    // FK a bank_accounts
-  forecastId?: string | null;   // FK a income_forecast_lines
-  movementId?: string | null;   // FK a movements (igual que APP)
   multiItems?: MultiItem[];     // Mini-items para tareas MULTI
   extra?: TaskExtra;
   createdAt?: string;
@@ -113,22 +110,6 @@ export interface Meta {
 
 /** ID fijo para la meta puntual por defecto (misma constante que APP) */
 export const SYSTEM_PUNTUAL_META_ID = "2c1c1e7e-3f5a-4ed6-9d1f-6b1f5b0a3c1d";
-
-// Bank Account desde Supabase
-export interface BankAccount {
-  id: string;
-  name: string;
-  type?: "PERSONAL" | "SOCIEDAD";
-  balance?: number;
-}
-
-// Income Forecast Line desde Supabase
-export interface ForecastLine {
-  id: string;
-  name: string;
-  type: "INGRESO" | "GASTO";
-  parentId?: string | null;
-}
 
 // Scoring Item desde app_settings.scoringSettings.items[]
 // Categorías: PHYSICAL -> FISICO, KNOWLEDGE -> CRECIMIENTO

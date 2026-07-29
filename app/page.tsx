@@ -51,7 +51,7 @@ export default function Home() {
 
       {/* Features Section */}
       <section className="mt-20 sm:mt-28 py-16 -mx-6 px-6 bg-slate-50/70 rounded-3xl">
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2">
           {/* Feature 1 - Metas claras */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="h-[320px] bg-white flex items-center justify-center py-4 px-0">
@@ -92,25 +92,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Feature 3 - Control real */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
-            <div className="h-[320px] bg-white flex items-center justify-center py-4 px-0">
-              <div className="relative w-full h-full">
-                <Image
-                  src="/images/home/feature-finanzas.png"
-                  alt="Control real"
-                  fill
-                  className="object-contain"
-                />
-              </div>
-            </div>
-            <div className="p-5">
-              <h3 className="text-lg font-semibold text-slate-900">Control real</h3>
-              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                Tus acciones conectadas con tus finanzas.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 

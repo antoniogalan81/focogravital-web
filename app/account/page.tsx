@@ -803,10 +803,10 @@ export default function AccountPage() {
                 </svg>
               </Link>
               <Link
-                href="/finanzas"
+                href="/agenda?view=metas"
                 className="flex items-center justify-between px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group"
               >
-                <span className="text-sm font-medium text-slate-700">Ver Finanzas</span>
+                <span className="text-sm font-medium text-slate-700">Ver Metas</span>
                 <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

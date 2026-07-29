@@ -3,10 +3,10 @@ import { BRAND } from "@/src/lib/site";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${BRAND} — metas, agenda y finanzas`,
+    name: `${BRAND} — metas, agenda y tareas`,
     short_name: BRAND,
     description:
-      "Convierte tus metas en acciones diarias. Agenda, metas y finanzas conectadas.",
+      "Convierte tus metas en acciones diarias. Metas, tareas y agenda en un solo sitio.",
     lang: "es",
     start_url: "/agenda?view=agenda",
     scope: "/",

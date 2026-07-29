@@ -3,7 +3,7 @@
 import React from "react";
 import { useCallback, useRef, useEffect, useState, useMemo, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import type { TaskRow, TaskData, Meta, BankAccount, ForecastLine, Label, MultiItem } from "@/src/lib/types";
+import type { TaskRow, TaskData, Meta, Label, MultiItem } from "@/src/lib/types";
 import { buildNewTaskData, getReminderDisplay } from "@/src/lib/tasks";
 import TaskEditPanel from "@/src/components/TaskEditPanel";
 import { createTaskActions } from "@/src/components/taskTaskActions";
@@ -50,8 +50,6 @@ const CONNECTOR_RADIUS = 4;
 interface Props {
   tasks: TaskRow[];
   metas: Meta[];
-  bankAccounts: BankAccount[];
-  forecastLines: ForecastLine[];
   labels: Label[];
   hidePoints?: boolean;
   onCreateTask: (taskData: TaskData) => Promise<{ success: boolean; error?: string }>;
@@ -125,30 +123,11 @@ function formatEUR(amount?: number): string {
   return formatEURCompact(amount);
 }
 
-function getInlinePrimaryText(
-  data: TaskData,
-  _bankAccounts: BankAccount[],
-  _forecastLines: ForecastLine[]
-): string {
-  const isFinance = data.type === "INGRESO" || data.type === "GASTO";
-  const physLike = isPhysLike(data);
-
+function getInlinePrimaryText(data: TaskData): string {
   const title = (data.title || "").trim();
   const label = (data.label || "").trim();
-  const base = title || label || "Sin nombre";
-
-  // Para finanzas: solo el título base (amount/banco/previsión se muestran aparte)
-  if (isFinance) {
-    return base;
-  }
-
-  // Para físicas: solo el título base (quantity+unit se muestran aparte en columna derecha)
-  if (physLike) {
-    return base;
-  }
-
-  // Actividad / otros
-  return `${base}`.trim();
+  // El importe y la cantidad fisica se muestran aparte, en su propia columna.
+  return title || label || "Sin nombre";
 }
 
 function formatDateShort(isoDate: string | null | undefined): string {
@@ -461,7 +440,7 @@ function calculateInsertOrder(siblings: TaskRow[], position: "before" | "after",
 // ==================== COMPONENTE PRINCIPAL ====================
 
 export default function TaskDiagramTree({
-  tasks, metas, bankAccounts, forecastLines, labels, hidePoints,
+  tasks, metas, labels, hidePoints,
   onCreateTask, onUpdateTask, onDeleteTask, onRestoreTask, onOpenMetaModal, onReorderMetas, onToggleMetaActive,
   hideCompletedTasks, onToggleHideCompleted, userId, onMetaChipSelect, initialSelectedMetaId,
   onAddLocalDraft, onDiscardDraft, isDraftTask,
@@ -495,7 +474,7 @@ export default function TaskDiagramTree({
   const META_DRAG_THRESHOLD = 5;
 
   // ==================== INLINE EDIT STATE ====================
-  type InlineField = "title" | "date" | "time" | "amount" | "bankAccountId" | "forecastLineId" | "repeatDays";
+  type InlineField = "title" | "date" | "time" | "amount" | "repeatDays";
   const [inlineEdit, setInlineEdit] = useState<{
     taskId: string;
     field: InlineField;
@@ -520,30 +499,6 @@ export default function TaskDiagramTree({
   } | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [dragOver, setDragOver] = useState<{ targetId: string; position: "before" | "after" | "inside" } | null>(null);
-  // UNICA FUENTE DE VERDAD: IDs de fuentes que tienen hijos (NO son hojas)
-  const parentIdsWithChildren = useMemo(() => {
-    const set = new Set<string>();
-    forecastLines.forEach(f => {
-      if (f.parentId) set.add(f.parentId);
-    });
-    return set;
-  }, [forecastLines]);
-
-  // SOLO HOJAS: fuentes que NO tienen hijos
-  const onlyLeafForecasts = useMemo(
-    () => forecastLines.filter(f => !parentIdsWithChildren.has(f.id)),
-    [forecastLines, parentIdsWithChildren]
-  );
-
-
-  // Helper: buscar una fuente SOLO en hojas (para display seguro)
-  const findLeafForecast = useCallback(
-    (id: string | null | undefined) => id ? onlyLeafForecasts.find(f => f.id === id) : undefined,
-    [onlyLeafForecasts]
-  );
-
-  // Legacy alias
-  const hasForecastChildren = useCallback((id?: string) => !!(id && parentIdsWithChildren.has(id)), [parentIdsWithChildren]);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const pendingScrollTaskIdRef = useRef<string | null>(null);
@@ -791,8 +746,8 @@ export default function TaskDiagramTree({
       case "amount": {
         const amountStr = draft as string;
         const amountNum = amountStr === "" ? undefined : parseFloat(amountStr);
-        const isFinancial = task.data.type === "INGRESO" || task.data.type === "GASTO";
-        if (isFinancial) {
+        const hasAmount = task.data.type === "INGRESO" || task.data.type === "GASTO";
+        if (hasAmount) {
           updates = { extra: { ...task.data.extra, amountEUR: amountNum } };
         } else {
           // Para tareas físicas: actualizar quantity
@@ -800,12 +755,6 @@ export default function TaskDiagramTree({
         }
         break;
       }
-      case "bankAccountId":
-        updates = { accountId: draft as string || undefined };
-        break;
-      case "forecastLineId":
-        updates = { forecastId: draft as string || undefined };
-        break;
       case "repeatDays":
         const days = draft as WeekdayCode[];
         updates = { 
@@ -1322,7 +1271,7 @@ export default function TaskDiagramTree({
     const isDraggingThis = dragging?.id === data.id && dragging.isDragActive;
     const isDropTarget = dragOver?.targetId === data.id;
     const dropPosition = isDropTarget ? dragOver.position : null;
-    const primaryText = getInlinePrimaryText(data, bankAccounts, forecastLines);
+    const primaryText = getInlinePrimaryText(data);
     const isTitleTask = data.kind === "TITLE";
     const isMulti = data.type === "MULTI" && Array.isArray(data.multiItems) && data.multiItems.length > 0;
     const hasMultiItems = isMulti;
@@ -1515,11 +1464,11 @@ export default function TaskDiagramTree({
 
                     {/* Cantidad física pegada al título */}
                     {(() => {
-                      const isFinancial = data.type === "INGRESO" || data.type === "GASTO";
+                      const hasAmount = data.type === "INGRESO" || data.type === "GASTO";
                       const isPhysOrKnow = data.scope === "FISICO" || data.scope === "CRECIMIENTO";
                       const hasQuantity = data.extra?.quantity !== undefined && data.extra?.quantity !== null;
                       // Solo mostrar quantity si es tarea física/conocimiento Y tiene quantity
-                      if (isFinancial || !isPhysOrKnow || !hasQuantity) return null;
+                      if (hasAmount || !isPhysOrKnow || !hasQuantity) return null;
 
                       if (inlineEdit?.taskId === data.id && inlineEdit.field === "amount") {
                         return (
@@ -1597,10 +1546,10 @@ export default function TaskDiagramTree({
 
                   {/* Bloque derecho: fecha/hora + extras inline */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Cantidad inline: solo finanzas (amountEUR) - físicas van junto al título */}
+                    {/* Importe inline (amountEUR) para INGRESO/GASTO - físicas van junto al título */}
                     {(() => {
-                      const isFinancial = data.type === "INGRESO" || data.type === "GASTO";
-                      if (!isFinancial) return null;
+                      const hasAmount = data.type === "INGRESO" || data.type === "GASTO";
+                      if (!hasAmount) return null;
 
                       if (inlineEdit?.taskId === data.id && inlineEdit.field === "amount") {
                         return (
@@ -1640,38 +1589,6 @@ export default function TaskDiagramTree({
                         </span>
                       );
                     })()}
-
-                    {/* Banco inline (solo finanzas) */}
-                    {(data.type === "INGRESO" || data.type === "GASTO") && bankAccounts.length > 0 && (
-                      <span
-                        data-no-drag
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (didDragRef.current) return;
-                          inlineAnchorRef.current = e.currentTarget as HTMLElement;
-                          openInline(task, "bankAccountId", data.accountId || "", data.accountId ?? undefined);
-                        }}
-                        className="text-xs text-slate-500 cursor-pointer hover:bg-slate-50 rounded px-1"
-                      >
-                        {data.accountId ? bankAccounts.find(b => b.id === data.accountId)?.name || "Banco" : "Sin asociar"}
-                      </span>
-                    )}
-
-                    {/* Previsión inline (solo finanzas) - SOLO HOJAS */}
-                    {(data.type === "INGRESO" || data.type === "GASTO") && onlyLeafForecasts.length > 0 && (
-                      <span
-                        data-no-drag
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (didDragRef.current) return;
-                          inlineAnchorRef.current = e.currentTarget as HTMLElement;
-                          openInline(task, "forecastLineId", data.forecastId || "", data.forecastId ?? undefined);
-                        }}
-                        className="text-xs text-slate-500 cursor-pointer hover:bg-slate-50 rounded px-1"
-                      >
-                        {data.forecastId ? findLeafForecast(data.forecastId)?.name || "Sin asociar" : "Sin asociar"}
-                      </span>
-                    )}
 
                     {/* Fecha inline con overlay nativo */}
                     {(() => {
@@ -1921,8 +1838,6 @@ export default function TaskDiagramTree({
             renderContent={(t) => (
               <TaskEditPanel
                 task={t}
-                bankAccounts={bankAccounts}
-                forecastLines={forecastLines}
                 labels={labels}
                 onUpdateTask={onUpdateTask}
                 onDeleteTask={onDeleteTask}
@@ -2352,7 +2267,7 @@ export default function TaskDiagramTree({
       })()}
 
       {/* Popover chips inline anclado */}
-      {inlineEdit && (inlineEdit.field === "bankAccountId" || inlineEdit.field === "forecastLineId" || inlineEdit.field === "repeatDays") && inlineAnchorRef.current && ReactDOM.createPortal(
+      {inlineEdit && inlineEdit.field === "repeatDays" && inlineAnchorRef.current && ReactDOM.createPortal(
         (() => {
           const anchorRect = inlineAnchorRef.current!.getBoundingClientRect();
           const task = tasks.find(t => t.data.id === inlineEdit.taskId);
@@ -2370,49 +2285,6 @@ export default function TaskDiagramTree({
               }}
             >
               <div className="flex flex-row flex-wrap justify-center gap-1 max-w-[320px]">
-                {inlineEdit.field === "bankAccountId" && (
-                  <>
-                    <button
-                      data-no-drag
-                      onClick={(e) => { e.stopPropagation(); setInlineEdit(prev => prev ? { ...prev, draft: "" } : null); commitInline(); }}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${!inlineEdit.draft ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}
-                    >
-                      Sin banco
-                    </button>
-                    {bankAccounts.map(ba => (
-                      <button
-                        key={ba.id}
-                        data-no-drag
-                        onClick={(e) => { e.stopPropagation(); setInlineEdit(prev => prev ? { ...prev, draft: ba.id } : null); setTimeout(commitInline, 0); }}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${inlineEdit.draft === ba.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}
-                      >
-                        {ba.name}
-                      </button>
-                    ))}
-                  </>
-                )}
-                {inlineEdit.field === "forecastLineId" && (
-                  <>
-                    <button
-                      data-no-drag
-                      onClick={(e) => { e.stopPropagation(); setInlineEdit(prev => prev ? { ...prev, draft: "" } : null); commitInline(); }}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${!inlineEdit.draft ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}
-                    >
-                      Sin asociar
-                    </button>
-                    {/* SOLO HOJAS (sin filtrar por type) */}
-                    {onlyLeafForecasts.map(fl => (
-                      <button
-                        key={fl.id}
-                        data-no-drag
-                        onClick={(e) => { e.stopPropagation(); setInlineEdit(prev => prev ? { ...prev, draft: fl.id } : null); setTimeout(commitInline, 0); }}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${inlineEdit.draft === fl.id ? "bg-blue-500 text-white border-blue-500" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}
-                      >
-                        {fl.name}
-                      </button>
-                    ))}
-                  </>
-                )}
                 {inlineEdit.field === "repeatDays" && (
                   <>
                     {WEEKDAY_CODES.map(day => {

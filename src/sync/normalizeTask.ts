@@ -195,7 +195,7 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
     }
   }
   
-  // Campos financieros
+  // Importe de las tareas de tipo INGRESO/GASTO
   if (task.type === "INGRESO" || task.type === "GASTO") {
     const amount = task.extra?.amountEUR;
     if (typeof amount === "number" && amount > 0) {
@@ -240,14 +240,6 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
   // completedDates (solo si tiene elementos)
   if (Array.isArray(task.extra?.completedDates) && task.extra.completedDates.length > 0) {
     normalizedExtra.completedDates = task.extra.completedDates;
-  }
-  
-  // movementIdsByDate (solo si tiene claves)
-  if (task.extra?.movementIdsByDate && typeof task.extra.movementIdsByDate === "object") {
-    const mvIds = task.extra.movementIdsByDate;
-    if (Object.keys(mvIds).length > 0) {
-      normalizedExtra.movementIdsByDate = mvIds;
-    }
   }
   
   // ==================== BUILD RESULT ====================
@@ -322,21 +314,6 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
     }
   }
   
-  // accountId: solo si existe y es financiero
-  if ((task.type === "INGRESO" || task.type === "GASTO") && task.accountId) {
-    result.accountId = task.accountId;
-  }
-  
-  // forecastId: solo si existe y es financiero
-  if ((task.type === "INGRESO" || task.type === "GASTO") && task.forecastId) {
-    result.forecastId = task.forecastId;
-  }
-  
-  // movementId: solo si existe y es financiero
-  if ((task.type === "INGRESO" || task.type === "GASTO") && task.movementId) {
-    result.movementId = task.movementId;
-  }
-  
   // isCompleted: solo si es true
   if (task.isCompleted === true) {
     result.isCompleted = true;
@@ -392,9 +369,6 @@ export function hydrateTaskFromDb(dbTask: Record<string, unknown>): TaskData {
   if (typeof dbExtra.reminderOffsetUnit === "string") extra.reminderOffsetUnit = dbExtra.reminderOffsetUnit as "min" | "hor";
   if (typeof dbExtra.reminderOffsetValue === "number") extra.reminderOffsetValue = dbExtra.reminderOffsetValue;
   if (Array.isArray(dbExtra.completedDates)) extra.completedDates = dbExtra.completedDates as string[];
-  if (dbExtra.movementIdsByDate && typeof dbExtra.movementIdsByDate === "object") {
-    extra.movementIdsByDate = dbExtra.movementIdsByDate as Record<string, string>;
-  }
   // extra.multiItems (legacy: string[] para compatibilidad con TaskEditorContent)
   if (Array.isArray(dbExtra.multiItems) && dbExtra.multiItems.length > 0) {
     extra.multiItems = dbExtra.multiItems as string[];
@@ -421,9 +395,6 @@ export function hydrateTaskFromDb(dbTask: Record<string, unknown>): TaskData {
     repeatRule: (dbTask.repeatRule as string | null) ?? null,
     points: typeof dbTask.points === "number" ? dbTask.points : (isTitle ? 0 : 2),
     isCompleted: dbTask.isCompleted === true,
-    accountId: (dbTask.accountId as string | null) ?? null,
-    forecastId: (dbTask.forecastId as string | null) ?? null,
-    movementId: (dbTask.movementId as string | null) ?? null,
     extra,
     ...(Array.isArray(dbTask.multiItems) && dbTask.multiItems.length > 0
       ? { multiItems: dbTask.multiItems as TaskData["multiItems"] }

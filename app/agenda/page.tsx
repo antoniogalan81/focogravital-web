@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useSync } from "@/src/sync/SyncContext";
 import { supabase } from "@/src/lib/supabaseClient";
-import type { TaskRow, TaskData, TaskFilters, FilterPreset, AgendaUIState, Meta, BankAccount, ForecastLine, Label, MultiItem } from "@/src/lib/types";
+import type { TaskRow, TaskData, TaskFilters, FilterPreset, AgendaUIState, Meta, Label, MultiItem } from "@/src/lib/types";
 import { DEFAULT_FILTERS, DEFAULT_UI_STATE } from "@/src/lib/types";
 import { 
-  fetchTasks, fetchMetas, fetchBankAccounts, fetchForecastLines, fetchLabels,
+  fetchTasks, fetchMetas, fetchLabels,
   createTask, updateTask, deleteTask, restoreTask, createMeta, updateMeta, deleteMetaAndTasks, restoreMeta,
   updateMetaOrder, updateMetaIsActive, filterTasks, sortTasksByHierarchy
 } from "@/src/lib/tasks";
 import { loadUIState, saveUIState, savePreset, deletePreset } from "@/src/lib/localStorage";
-import { upsertMovement, softDeleteMovement, applyAccountBalanceDelta } from "@/src/lib/finance/financeApi";
-import type { FinanceMovement } from "@/src/lib/finance/financeData";
 import AgendaSidebar from "@/src/components/AgendaSidebar";
 import TaskDiagramTree from "@/src/components/TaskDiagramTree";
 import MetaModal from "@/src/components/MetaModal";
@@ -61,16 +58,6 @@ type SaveMetaInput = {
 type AgendaView = "metas" | "agenda";
 
 export default function AgendaPage() {
-  // SyncContext — in-memory cache survives navigation; eliminates refetch on re-visit
-  const {
-    bankAccounts: syncBankAccounts,
-    incomeForecastLines: syncForecastLines,
-    lastSyncAt: syncLastSyncAt,
-    notifyFinanceMovementUpdated,
-    notifyFinanceMovementDeleted,
-    notifyBankAccountUpdated,
-  } = useSync();
-
   // Vista activa: desde URL (?view=agenda|metas) o default agenda
   const [activeView, setActiveView] = useState<AgendaView>("agenda");
   // Sincronizar con URL al montar/navegar (p.ej. desde SiteShell)
@@ -97,8 +84,6 @@ export default function AgendaPage() {
   // Data
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [forecastLines, setForecastLines] = useState<ForecastLine[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -217,22 +202,9 @@ export default function AgendaPage() {
       setLoadingData(true);
       setError(null);
 
-      // Use SyncContext cache when available (0 Supabase queries on re-navigation).
-      // lastSyncAt !== null means SyncContext completed at least one pull — data is
-      // authoritative even if the arrays are empty.
-      const syncReady = syncLastSyncAt !== null;
-      const accountsFetch = syncReady
-        ? Promise.resolve({ data: syncBankAccounts as unknown as BankAccount[], error: null })
-        : fetchBankAccounts();
-      const forecastFetch = syncReady
-        ? Promise.resolve({ data: syncForecastLines as unknown as ForecastLine[], error: null })
-        : fetchForecastLines();
-
-      const [tasksRes, metasRes, accountsRes, forecastRes, labelsRes] = await Promise.all([
+      const [tasksRes, metasRes, labelsRes] = await Promise.all([
         fetchTasks(),
         fetchMetas(),
-        accountsFetch,
-        forecastFetch,
         fetchLabels(),
       ]);
 
@@ -243,8 +215,6 @@ export default function AgendaPage() {
       }
 
       setMetas(metasRes.data || []);
-      setBankAccounts(accountsRes.data || []);
-      setForecastLines(forecastRes.data || []);
       setLabels(labelsRes.data || []);
 
       setLoadingData(false);
@@ -252,13 +222,6 @@ export default function AgendaPage() {
 
     loadData();
   }, [authState.authenticated]);
-
-  // Keep local bankAccounts in sync when SyncContext pulls updates from other devices
-  useEffect(() => {
-    if (syncBankAccounts.length > 0) {
-      setBankAccounts(syncBankAccounts as unknown as BankAccount[]);
-    }
-  }, [syncBankAccounts]);
 
   // Auto-collapse sidebar on mobile (< 768px) on initial mount
   useEffect(() => {
@@ -382,129 +345,38 @@ export default function AgendaPage() {
     return { success: true };
   }, []);
 
-  // Maneja el toggle de tareas financieras (INGRESO/GASTO).
-  // Para PUNTUAL: crea/elimina movimiento y ajusta balance.
-  // Para SEMANAL/MENSUAL: usa completedDates + movementIdsByDate (igual que la app móvil).
-  // Devuelve los campos que deben incluirse en el updateTask posterior.
-  const handleFinancialToggle = useCallback(async (
+  // Calcula los campos que hay que guardar al marcar/desmarcar una tarea.
+  // Las recurrentes (SEMANAL/MENSUAL) no usan isCompleted: llevan la lista de
+  // fechas completadas, igual que en la app móvil.
+  const buildToggleFields = useCallback((
     task: TaskRow,
     newIsCompleted: boolean,
     occurrenceISO?: string,
-  ): Promise<Partial<TaskData>> => {
+  ): Partial<TaskData> => {
     const data = task.data;
-    const isFinancial = data.type === "INGRESO" || data.type === "GASTO";
     const isRecurring = data.extra?.frequency === "SEMANAL" || data.extra?.frequency === "MENSUAL";
-    const amount = Math.abs(data.extra?.amountEUR ?? 0);
 
-    if (!isFinancial || amount <= 0) {
+    if (!isRecurring) {
       return { isCompleted: newIsCompleted };
     }
 
-    // Aplica delta atómico al balance en Supabase via RPC (un solo UPDATE, sin race conditions).
-    // Actualiza el estado local con el nuevo balance que devuelve el servidor.
-    const applyBalanceDelta = async (delta: number) => {
-      if (!data.accountId) return;
-      const { newBalance, error } = await applyAccountBalanceDelta(data.accountId, delta);
-      if (error || newBalance === null) return;
-      const acc = (syncBankAccounts as unknown as BankAccount[]).find(a => a.id === data.accountId)
-        ?? bankAccounts.find(a => a.id === data.accountId);
-      if (!acc) return;
-      const updatedAcc = { ...acc, balance: newBalance };
-      setBankAccounts(prev => prev.map(a => a.id === data.accountId ? updatedAcc : a));
-      notifyBankAccountUpdated(updatedAcc as unknown as Parameters<typeof notifyBankAccountUpdated>[0]);
-    };
+    const today = occurrenceISO ?? new Date().toISOString().slice(0, 10);
+    const completedDates = [...(data.extra?.completedDates ?? [])];
+    const isAlreadyDone = completedDates.includes(today);
 
-    // ---- RECURRING (SEMANAL / MENSUAL) ----
-    // Misma lógica que toggleTaskCompleted en la app: completedDates + movementIdsByDate.
-    if (isRecurring) {
-      const today = occurrenceISO ?? new Date().toISOString().slice(0, 10);
-      const completedDates = [...(data.extra?.completedDates ?? [])];
-      const movementIdsByDate: Record<string, string> = { ...(data.extra?.movementIdsByDate ?? {}) };
-      const isAlreadyDone = completedDates.includes(today);
+    if (newIsCompleted && !isAlreadyDone) {
+      completedDates.push(today);
+    } else if (!newIsCompleted && isAlreadyDone) {
+      completedDates.splice(completedDates.indexOf(today), 1);
+    }
 
-      if (newIsCompleted && !isAlreadyDone) {
-        const movementId = crypto.randomUUID();
-        const movement: FinanceMovement = {
-          id: movementId,
-          date: today,
-          concept: data.title,
-          amount,
-          type: data.type as "INGRESO" | "GASTO",
-          accountId: data.accountId ?? null,
-          tags: data.label ? [data.label] : [],
-          label: data.label ?? null,
-          note: data.description ?? null,
-          frequency: "PUNTUAL",
-          linkedPredictionId: data.forecastId ?? null,
-          forecastId: data.forecastId ?? null,
-        };
-        await upsertMovement(movement);
-        notifyFinanceMovementUpdated(movement as unknown as Parameters<typeof notifyFinanceMovementUpdated>[0]);
-        const delta = data.type === "GASTO" ? -amount : amount;
-        await applyBalanceDelta(delta);
-        completedDates.push(today);
-        movementIdsByDate[today] = movementId;
-
-      } else if (!newIsCompleted && isAlreadyDone) {
-        const movementId = movementIdsByDate[today];
-        if (movementId) {
-          await softDeleteMovement(movementId);
-          notifyFinanceMovementDeleted(movementId);
-          const delta = data.type === "GASTO" ? amount : -amount;
-          await applyBalanceDelta(delta);
-        }
-        const idx = completedDates.indexOf(today);
-        if (idx >= 0) completedDates.splice(idx, 1);
-        delete movementIdsByDate[today];
-      }
-
-      const newExtra = {
+    return {
+      extra: {
         ...data.extra,
         completedDates: completedDates.length > 0 ? completedDates : undefined,
-        movementIdsByDate: Object.keys(movementIdsByDate).length > 0 ? movementIdsByDate : undefined,
-      };
-      return { extra: newExtra };
-    }
-
-    // ---- PUNTUAL ----
-    const extraFields: Partial<TaskData> = { isCompleted: newIsCompleted };
-
-    if (newIsCompleted && !data.movementId) {
-      const movementId = crypto.randomUUID();
-      const dateISO = (typeof data.date === "string" && data.date.length >= 10)
-        ? data.date.slice(0, 10)
-        : occurrenceISO ?? new Date().toISOString().slice(0, 10);
-
-      const movement: FinanceMovement = {
-        id: movementId,
-        date: dateISO,
-        concept: data.title,
-        amount,
-        type: data.type as "INGRESO" | "GASTO",
-        accountId: data.accountId ?? null,
-        tags: data.label ? [data.label] : [],
-        label: data.label ?? null,
-        note: data.description ?? null,
-        frequency: "PUNTUAL",
-        linkedPredictionId: data.forecastId ?? null,
-        forecastId: data.forecastId ?? null,
-      };
-      await upsertMovement(movement);
-      notifyFinanceMovementUpdated(movement as unknown as Parameters<typeof notifyFinanceMovementUpdated>[0]);
-      const delta = data.type === "GASTO" ? -amount : amount;
-      await applyBalanceDelta(delta);
-      extraFields.movementId = movementId;
-
-    } else if (!newIsCompleted && data.movementId) {
-      await softDeleteMovement(data.movementId);
-      notifyFinanceMovementDeleted(data.movementId);
-      const delta = data.type === "GASTO" ? amount : -amount;
-      await applyBalanceDelta(delta);
-      extraFields.movementId = null;
-    }
-
-    return extraFields;
-  }, [syncBankAccounts, bankAccounts, setBankAccounts, notifyFinanceMovementUpdated, notifyFinanceMovementDeleted, notifyBankAccountUpdated]);
+      },
+    };
+  }, []);
 
   const handleDeleteTask = useCallback(async (id: string): Promise<{ success: boolean; error?: string }> => {
     const result = await deleteTask(id);
@@ -1004,7 +876,7 @@ export default function AgendaPage() {
     const handleToggleComplete = async (e: React.MouseEvent) => {
       e.stopPropagation();
       const newIsCompleted = !isCompleted; // isCompleted ya refleja completedDates para recurrentes
-      const extraFields = await handleFinancialToggle(task, newIsCompleted, todayISO);
+      const extraFields = buildToggleFields(task, newIsCompleted, todayISO);
       await handleUpdateTask(taskId, extraFields);
       setTasks(prev => prev.map(t =>
         t.data.id === taskId
@@ -1260,12 +1132,6 @@ export default function AgendaPage() {
               Metas
             </button>
             <a
-              href="/finanzas"
-              className="hidden sm:inline px-3 py-1 text-xs font-medium rounded-md transition-colors text-slate-500 hover:text-slate-700"
-            >
-              Finanzas
-            </a>
-            <a
               href="/donaciones"
               className="hidden md:inline px-3 py-1 text-xs font-medium rounded-md transition-colors text-slate-500 hover:text-slate-700"
             >
@@ -1366,8 +1232,6 @@ export default function AgendaPage() {
                   tasks={sortedTasks}
                   metas={metas}
                   initialSelectedMetaId={initialSelectedMetaId}
-                  bankAccounts={bankAccounts}
-                  forecastLines={forecastLines}
                   labels={labels}
                   hidePoints={uiState.activeFilters.hidePoints}
                   onCreateTask={handleCreateTask}
@@ -1528,7 +1392,7 @@ export default function AgendaPage() {
                           const handleToggleComplete = async (e: React.MouseEvent) => {
                             e.stopPropagation();
                             const newIsCompleted = !isCompleted;
-                            const extraFields = await handleFinancialToggle(task, newIsCompleted);
+                            const extraFields = buildToggleFields(task, newIsCompleted);
                             await handleUpdateTask(taskId, extraFields);
                             setTasks(prev => prev.map(t =>
                               t.data.id === taskId
@@ -1912,8 +1776,6 @@ export default function AgendaPage() {
                   await taskEditor.handleSaveAndClose();
                   if (!taskEditor.editingTaskId) setTaskEditorOpen(false);
                 }}
-                bankAccounts={bankAccounts}
-                forecastLines={forecastLines}
                 metas={metas}
                 tasks={tasks}
                 // NO pasamos onCreateTask - en Agenda Enter/Tab no crean tareas

@@ -7,7 +7,7 @@ import { BRAND, CONTACT_EMAIL, WHATSAPP_URL } from "@/src/lib/site";
 
 type Props = {
   children: ReactNode;
-  active?: "home" | "servicios" | "legal" | "agenda" | "metas" | "finanzas";
+  active?: "home" | "servicios" | "legal" | "agenda" | "metas";
 };
 
 export default function SiteShell({ children, active }: Props) {
@@ -55,16 +55,6 @@ export default function SiteShell({ children, active }: Props) {
               >
                 Metas
               </Link>
-              <Link
-                href="/finanzas"
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  active === "finanzas"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                Finanzas
-              </Link>
             </nav>
 
             {/* Right actions */}
@@ -110,16 +100,6 @@ export default function SiteShell({ children, active }: Props) {
               }`}
             >
               Metas
-            </Link>
-            <Link
-              href="/finanzas"
-              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
-                active === "finanzas"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 bg-slate-100"
-              }`}
-            >
-              Finanzas
             </Link>
           </nav>
         </div>

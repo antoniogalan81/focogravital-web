@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 const DESCRIPTION =
-  "Focogravital es el sistema para convertir tus metas en acciones diarias: agenda, metas y finanzas conectadas en una sola app.";
+  "Focogravital es el sistema para convertir tus metas en acciones diarias: metas, tareas y agenda en una sola app.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

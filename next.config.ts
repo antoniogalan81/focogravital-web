@@ -27,6 +27,13 @@ const nextConfig: NextConfig = {
         destination: "/focogravital.apk",
         permanent: true,
       },
+      // Finanzas ya no existe. Los enlaces y marcadores antiguos van a la agenda
+      // en vez de a un 404. No queda nada del modulo detras de esta redireccion.
+      {
+        source: "/finanzas",
+        destination: "/agenda?view=agenda",
+        permanent: true,
+      },
     ];
   },
 };

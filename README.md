@@ -1,6 +1,6 @@
 # Focogravital — web
 
-Aplicación de metas, agenda y finanzas. Antes se publicaba como **Ingravital**;
+Aplicación de metas, tareas y agenda. Antes se publicaba como **Ingravital**;
 desde julio de 2026 la marca es **Focogravital** y el dominio canónico es
 `https://focogravital.com`.
 
