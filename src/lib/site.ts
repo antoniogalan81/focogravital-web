@@ -19,8 +19,12 @@ export const CONTACT_EMAIL = "contacto@focogravital.com";
 
 export const WHATSAPP_URL = "https://wa.me/34656195880";
 
-/** Nombre del APK publicado. El antiguo (ingravital.apk) se redirige aquí. */
+/** Nombre del archivo tal y como llega al dispositivo. */
 export const APK_FILENAME = "focogravital.apk";
 
-/** Descarga del APK servida por el propio sitio. */
-export const ANDROID_APK_URL = `/${APK_FILENAME}`;
+/**
+ * Descarga del APK servida por el propio sitio. La ruta y los datos de la
+ * versión publicada viven en `src/lib/androidRelease.ts`; aquí solo se
+ * reexporta para no romper los imports existentes.
+ */
+export { ANDROID_DOWNLOAD_PATH as ANDROID_APK_URL } from "./androidRelease";

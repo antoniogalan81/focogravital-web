@@ -1,5 +1,6 @@
 import Image from "next/image";
 import SiteShell from "@/components/SiteShell";
+import AndroidDownload from "@/components/AndroidDownload";
 import { ANDROID_APK_URL, APK_FILENAME, BRAND } from "@/src/lib/site";
 
 export default function Home() {
@@ -94,6 +95,8 @@ export default function Home() {
 
         </div>
       </section>
+
+      <AndroidDownload />
 
       {/* CTA Section */}
       <section className="mt-20 sm:mt-28 text-center py-16">
