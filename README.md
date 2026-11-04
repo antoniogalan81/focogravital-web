@@ -33,6 +33,27 @@ No hay suite de tests configurada.
 | `SUPABASE_SERVICE_ROLE_KEY` | Solo `/api/leads` (salta RLS, jamás en el cliente) |
 | `NEXT_PUBLIC_SITE_URL` | Opcional. Fuerza el dominio canónico. Sin ella se usa `https://focogravital.com` |
 
+## Autenticación (Supabase Auth)
+
+La sesión vive en el `localStorage` del navegador (`sb-<ref>-auth-token`), que
+es **por origen**: una sesión creada en `www.ingravital.com` no existe en
+`focogravital.com`. `supabase-js` la recupera al cargar y renueva el access
+token (1 h) con el refresh token, que no caduca mientras no se cierre sesión o
+se revoque (sin *time-box* ni *inactivity timeout* configurados).
+
+Configuración obligatoria en *Authentication → URL Configuration*:
+
+- **Site URL:** `https://focogravital.com`
+- **Redirect URLs:** `https://focogravital.com/**` (más `http://localhost:3000/**`
+  para desarrollo y `ingravitalapp://auth/callback` para la app Android).
+
+Si el origen desde el que se inicia sesión no está en *Redirect URLs*, Supabase
+ignora `redirectTo` **sin avisar** y devuelve al usuario a la *Site URL*: la
+sesión se guarda en ese otro dominio y el usuario tiene que volver a entrar con
+Google cada vez. Es lo que pasaba hasta noviembre de 2026, cuando la *Site URL*
+seguía siendo `ingravital.com`. Cualquier cambio de dominio tiene que tocar
+también esta configuración.
+
 ## Marca y dominio
 
 Todo lo relativo a marca, dominio, email de contacto y descarga del APK está
