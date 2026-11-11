@@ -18,6 +18,12 @@ export interface TaskExtra {
   reminderEnabled?: boolean;           // true si hay aviso activo
   reminderOffsetUnit?: "min" | "hor";  // unidad del offset (minutos u horas)
   reminderOffsetValue?: number;        // valor del offset (ej: 5 para "5 min antes")
+  // Avisos del móvil (APP utils/alertPlan.ts): la WEB sólo los conserva al sincronizar.
+  alertLevel?: "normal" | "alta" | "urgente";
+  alertSnooze?: { occurrence: string; until: string };
+  // Archivado (MAMA T5): la tarea deja de avisar en el móvil. Se conserva en el sync.
+  archived?: boolean;
+  archivedAt?: string;                 // ISO
   // Importe que el usuario anota en tareas de tipo INGRESO/GASTO.
   // Es un dato de la tarea, no del desaparecido módulo de finanzas.
   amountEUR?: number;

@@ -225,6 +225,14 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
     if (typeof task.extra?.reminderOffsetValue === "number") {
       normalizedExtra.reminderOffsetValue = task.extra.reminderOffsetValue;
     }
+    // Avisos del móvil (MAMA T5): conservar prioridad y «+1 hora» al guardar desde la WEB.
+    if (task.extra?.alertLevel === "alta" || task.extra?.alertLevel === "urgente") {
+      normalizedExtra.alertLevel = task.extra.alertLevel;
+    }
+    const snooze = task.extra?.alertSnooze;
+    if (snooze && typeof snooze.occurrence === "string" && typeof snooze.until === "string") {
+      normalizedExtra.alertSnooze = { occurrence: snooze.occurrence, until: snooze.until };
+    }
   }
   
   // Notas
@@ -241,7 +249,13 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
   if (Array.isArray(task.extra?.completedDates) && task.extra.completedDates.length > 0) {
     normalizedExtra.completedDates = task.extra.completedDates;
   }
-  
+
+  // Archivado (MAMA T5): conservarlo para que el móvil no reactive sus avisos.
+  if (task.extra?.archived === true) normalizedExtra.archived = true;
+  if (typeof task.extra?.archivedAt === "string" && Number.isFinite(Date.parse(task.extra.archivedAt))) {
+    normalizedExtra.archivedAt = task.extra.archivedAt;
+  }
+
   // ==================== BUILD RESULT ====================
   
   const result: Record<string, unknown> = {
@@ -368,7 +382,16 @@ export function hydrateTaskFromDb(dbTask: Record<string, unknown>): TaskData {
   if (dbExtra.reminderEnabled === true) extra.reminderEnabled = true;
   if (typeof dbExtra.reminderOffsetUnit === "string") extra.reminderOffsetUnit = dbExtra.reminderOffsetUnit as "min" | "hor";
   if (typeof dbExtra.reminderOffsetValue === "number") extra.reminderOffsetValue = dbExtra.reminderOffsetValue;
+  if (dbExtra.alertLevel === "alta" || dbExtra.alertLevel === "urgente") extra.alertLevel = dbExtra.alertLevel;
+  const dbSnooze = dbExtra.alertSnooze as { occurrence?: unknown; until?: unknown } | undefined;
+  if (dbSnooze && typeof dbSnooze.occurrence === "string" && typeof dbSnooze.until === "string") {
+    extra.alertSnooze = { occurrence: dbSnooze.occurrence, until: dbSnooze.until };
+  }
   if (Array.isArray(dbExtra.completedDates)) extra.completedDates = dbExtra.completedDates as string[];
+  if (dbExtra.archived === true) extra.archived = true;
+  if (typeof dbExtra.archivedAt === "string" && Number.isFinite(Date.parse(dbExtra.archivedAt))) {
+    extra.archivedAt = dbExtra.archivedAt;
+  }
   // extra.multiItems (legacy: string[] para compatibilidad con TaskEditorContent)
   if (Array.isArray(dbExtra.multiItems) && dbExtra.multiItems.length > 0) {
     extra.multiItems = dbExtra.multiItems as string[];
