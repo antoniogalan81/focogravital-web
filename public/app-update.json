@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "type": "apk",
-  "message": "Nueva versión 1.2.2 con Mama. Se instala encima: no desinstales la app.",
+  "message": "Nueva versión 1.2.3: corrige los botones de los avisos con la app cerrada. Se instala encima: no desinstales la app.",
   "apkUrl": "https://focogravital.com/focogravital.apk",
-  "latestVersion": "1.2.2"
+  "latestVersion": "1.2.3"
 }
