@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "type": "apk",
-  "message": "Nueva versión 1.2.4 con mejoras visuales. Se instala encima: no desinstales la app.",
+  "message": "Nueva versión 1.2.5: Mama y mejoras en las tareas. Se instala encima: no desinstales la app.",
   "apkUrl": "https://focogravital.com/focogravital.apk",
-  "latestVersion": "1.2.4"
+  "latestVersion": "1.2.5"
 }
