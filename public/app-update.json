@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "type": "apk",
-  "message": "Nueva versión 1.2.6: notas de voz y archivos adjuntos con Mama. Se instala encima: no desinstales la app.",
+  "message": "Nueva versión 1.2.7: dictado con el teclado en la pestaña IA para la cuenta con Mama. Se instala encima: no desinstales la app.",
   "apkUrl": "https://focogravital.com/focogravital.apk",
-  "latestVersion": "1.2.6"
+  "latestVersion": "1.2.7"
 }
