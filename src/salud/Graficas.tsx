@@ -3,16 +3,30 @@
 // + resaltado). Siempre con tabla de datos desplegable. Sin datos → no se dibuja nada (lo dice la pantalla).
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cx } from "./ui";
 
 export type Punto = { k: string; v: number; detalle?: string };
-const W = 640, H = 220, IZQ = 44, DER = 16, ARR = 16, ABA = 28;
+const H = 230, IZQ = 44, DER = 16, ARR = 28, ABA = 28;
 const fmt = (v: number) => (Math.abs(v) >= 10000 ? `${Math.round(v / 1000)} k` : String(Math.round(v * 10) / 10).replace(".", ","));
-function escala(max: number) {
+function escala(max: number, entero = false) {
+  if (entero && max <= 6) return { tope: Math.max(1, Math.ceil(max)), marcas: Array.from({ length: Math.max(1, Math.ceil(max)) + 1 }, (_, i) => i) };
   const paso = [1, 2, 2.5, 5, 10].map((m) => m * 10 ** Math.floor(Math.log10(Math.max(1, max) / 4))).find((p) => max / p <= 5) ?? max / 4;
   const tope = Math.max(paso, Math.ceil(max / paso) * paso);
   return { tope, marcas: Array.from({ length: Math.round(tope / paso) + 1 }, (_, i) => i * paso) };
+}
+
+/** Ancho real del contenedor: 1 unidad del SVG = 1 px (el texto no encoge en el móvil). */
+function useAncho(): [React.RefObject<HTMLDivElement | null>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(640);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(280, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
 }
 
 function Marco({ titulo, unidad, puntos, children }: { titulo: string; unidad: string; puntos: Punto[]; children: React.ReactNode }) {
@@ -33,7 +47,7 @@ function Marco({ titulo, unidad, puntos, children }: { titulo: string; unidad: s
   );
 }
 
-function Rejilla({ marcas, y, unidad }: { marcas: number[]; y: (v: number) => number; unidad: string }) {
+function Rejilla({ marcas, y, unidad, W }: { marcas: number[]; y: (v: number) => number; unidad: string; W: number }) {
   return (
     <g>
       {marcas.map((m) => (
@@ -46,20 +60,21 @@ function Rejilla({ marcas, y, unidad }: { marcas: number[]; y: (v: number) => nu
     </g>
   );
 }
-const etiquetasX = (n: number) => { const cada = Math.max(1, Math.ceil(n / 6)); return (i: number) => i % cada === 0 || i === n - 1; };
+const etiquetasX = (n: number, W: number) => { const cada = Math.max(1, Math.ceil(n / Math.max(3, Math.floor(W / 90)))); return (i: number) => i % cada === 0 || i === n - 1; };
 
 /** Evolución de un valor (1RM estimado, peso, reps…) por día. */
 export function Linea({ puntos, titulo, unidad }: { puntos: Punto[]; titulo: string; unidad: string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const { tope, marcas } = escala(Math.max(...puntos.map((p) => p.v), 1));
+  const [caja, W] = useAncho();
+  const { tope, marcas } = escala(Math.max(...puntos.map((p) => p.v), 1), puntos.every((p) => Number.isInteger(p.v)));
   const x = (i: number) => (puntos.length === 1 ? (IZQ + W - DER) / 2 : IZQ + (i * (W - IZQ - DER)) / (puntos.length - 1));
   const y = (v: number) => ARR + (1 - v / tope) * (H - ARR - ABA);
-  const muestra = etiquetasX(puntos.length);
+  const muestra = etiquetasX(puntos.length, W);
   const h = hover ?? puntos.length - 1;
   return (
     <Marco titulo={titulo} unidad={unidad} puntos={puntos}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${titulo}: ${puntos.map((p) => `${p.k} ${fmt(p.v)}`).join(", ")}`} onMouseLeave={() => setHover(null)}>
-        <Rejilla marcas={marcas} y={y} unidad={unidad} />
+      <div ref={caja}><svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${titulo}: ${puntos.map((p) => `${p.k} ${fmt(p.v)}`).join(", ")}`} onMouseLeave={() => setHover(null)}>
+        <Rejilla marcas={marcas} y={y} unidad={unidad} W={W} />
         {puntos.length > 1 ? <polyline fill="none" stroke="#2563EB" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" points={puntos.map((p, i) => `${x(i)},${y(p.v)}`).join(" ")} /> : null}
         {hover !== null ? <line x1={x(hover)} x2={x(hover)} y1={ARR} y2={H - ABA} stroke="#98A2B3" strokeWidth={1} strokeDasharray="3 3" /> : null}
         {puntos.map((p, i) => (
@@ -72,7 +87,7 @@ export function Linea({ puntos, titulo, unidad }: { puntos: Punto[]; titulo: str
         <text x={Math.min(Math.max(x(h), IZQ + 40), W - DER - 40)} y={Math.max(12, y(puntos[h].v) - 10)} textAnchor="middle" fontSize={12} fontWeight={700} fill="#0B1220">
           {fmt(puntos[h].v)} {unidad}{puntos[h].detalle ? ` · ${puntos[h].detalle}` : ""}
         </text>
-      </svg>
+      </svg></div>
     </Marco>
   );
 }
@@ -80,15 +95,16 @@ export function Linea({ puntos, titulo, unidad }: { puntos: Punto[]; titulo: str
 /** Barras verticales (volumen o series por semana). */
 export function Barras({ puntos, titulo, unidad }: { puntos: Punto[]; titulo: string; unidad: string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const { tope, marcas } = escala(Math.max(...puntos.map((p) => p.v), 1));
+  const [caja, W] = useAncho();
+  const { tope, marcas } = escala(Math.max(...puntos.map((p) => p.v), 1), puntos.every((p) => Number.isInteger(p.v)));
   const ancho = (W - IZQ - DER) / puntos.length;
   const y = (v: number) => ARR + (1 - v / tope) * (H - ARR - ABA);
-  const muestra = etiquetasX(puntos.length);
+  const muestra = etiquetasX(puntos.length, W);
   const h = hover ?? puntos.length - 1;
   return (
     <Marco titulo={titulo} unidad={unidad} puntos={puntos}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${titulo}: ${puntos.map((p) => `${p.k} ${fmt(p.v)}`).join(", ")}`} onMouseLeave={() => setHover(null)}>
-        <Rejilla marcas={marcas} y={y} unidad={unidad} />
+      <div ref={caja}><svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${titulo}: ${puntos.map((p) => `${p.k} ${fmt(p.v)}`).join(", ")}`} onMouseLeave={() => setHover(null)}>
+        <Rejilla marcas={marcas} y={y} unidad={unidad} W={W} />
         {puntos.map((p, i) => {
           const bx = IZQ + i * ancho + 1, bw = Math.max(2, Math.min(36, ancho - 4)), cxm = IZQ + i * ancho + ancho / 2;
           const alto = Math.max(p.v > 0 ? 2 : 0, H - ABA - y(p.v));
@@ -104,7 +120,7 @@ export function Barras({ puntos, titulo, unidad }: { puntos: Punto[]; titulo: st
         <text x={Math.min(Math.max(IZQ + h * ancho + ancho / 2, IZQ + 50), W - DER - 50)} y={Math.max(12, y(puntos[h].v) - 8)} textAnchor="middle" fontSize={12} fontWeight={700} fill="#0B1220">
           {fmt(puntos[h].v)} {unidad}{puntos[h].detalle ? ` · ${puntos[h].detalle}` : ""}
         </text>
-      </svg>
+      </svg></div>
     </Marco>
   );
 }
@@ -117,15 +133,17 @@ export function Musculos({ filas, referencia: ref }: { filas: { musculo: string;
   return (
     <figure>
       <figcaption className="mb-3 text-sm text-tinta2">Series por semana (las de músculo secundario cuentan la mitad). Banda: referencia orientativa {ref.min}–{ref.max}, no una prescripción.</figcaption>
-      <ul className="space-y-2.5">
+      <ul className="grid gap-x-8 gap-y-3 md:grid-cols-2">
         {filas.map((f) => (
-          <li key={f.musculo} className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[8rem_minmax(0,1fr)_9rem]">
-            <span className="font-semibold">{f.nombre}</span>
-            <span className="relative h-3 rounded-full bg-superficie2" title={`${f.nombre}: ${String(f.por_semana).replace(".", ",")} series/semana`}>
-              <span className="absolute inset-y-0 rounded-full bg-ok/15" style={{ left: pct(ref.min), width: `calc(${pct(ref.max)} - ${pct(ref.min)})` }} />
+          <li key={f.musculo} className="text-sm">
+            <div className="mb-1 flex items-baseline justify-between gap-3">
+              <span className="font-semibold">{f.nombre}</span>
+              <span className={cx("tabular-nums", NIVEL[f.nivel]?.c)}><b className="text-tinta">{String(f.por_semana).replace(".", ",")}</b> / semana · {NIVEL[f.nivel]?.t ?? f.nivel}</span>
+            </div>
+            <span className="relative block h-3 rounded-full bg-superficie2" title={`${f.nombre}: ${String(f.por_semana).replace(".", ",")} series/semana`}>
+              <span className="absolute inset-y-0 rounded-full bg-ok/20" style={{ left: pct(ref.min), width: `calc(${pct(ref.max)} - ${pct(ref.min)})` }} />
               <span className="absolute inset-y-0 left-0 rounded-full bg-acento" style={{ width: pct(Math.max(f.por_semana, 0)) }} />
             </span>
-            <span className={cx("text-right tabular-nums", NIVEL[f.nivel]?.c)}><b className="text-tinta">{String(f.por_semana).replace(".", ",")}</b> · {NIVEL[f.nivel]?.t ?? f.nivel}</span>
           </li>
         ))}
       </ul>

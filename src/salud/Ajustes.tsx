@@ -9,7 +9,8 @@ import { Boton, Chip, Etiqueta, Hoja, Interruptor, Paso, Segmento } from "./ui";
 
 type Form = { default_minutes: number | null; default_mode: string; rest_default: number; rest_superset: number; sound: boolean; vibration: boolean;
   advance_rule: string; chest_rule: string; chest_fraction: number; chest_floor: number; chest_min_sets: number; chest_weekly_min: number };
-const DURACIONES = [{ v: null, t: "Completa" }, { v: 30, t: "30" }, { v: 40, t: "40" }, { v: 60, t: "60" }, { v: 90, t: "90" }] as { v: number | null; t: string }[];
+// default_minutes es obligatorio en la base (10–240): no hay «Completa» como valor por defecto.
+const DURACIONES = [30, 40, 60, 90].map((v) => ({ v: v as number | null, t: `${v} min` }));
 const AVANCE = [
   { v: "principales", t: "Con los ejercicios principales", d: "Recomendado: avanza si completas, o si haces todos los ejercicios fundamentales." },
   { v: "completa", t: "Completa", d: "Sólo avanza si haces todas las series previstas." },
@@ -18,7 +19,7 @@ const AVANCE = [
 
 const formDe = (a: Ajustes): Form => {
   const r = M.reglas(a);
-  return { default_minutes: a.default_minutes ?? null, default_mode: a.default_mode || "normal", rest_default: a.rest_default ?? 90, rest_superset: a.rest_superset ?? 90,
+  return { default_minutes: a.default_minutes ?? 60, default_mode: a.default_mode || "normal", rest_default: a.rest_default ?? 90, rest_superset: a.rest_superset ?? 90,
     sound: a.sound ?? true, vibration: a.vibration ?? true, advance_rule: r.avance, chest_rule: r.pecho.modo, chest_fraction: r.pecho.fraccion, chest_floor: r.pecho.suelo,
     chest_min_sets: r.pecho.series, chest_weekly_min: r.pecho.sesiones };
 };
@@ -41,7 +42,7 @@ function FormAjustes({ ajustes, onListo }: { ajustes: Ajustes; onListo: () => vo
     <div className="space-y-6 pb-2">
       <section className="space-y-3">
         <Etiqueta>Duración por defecto</Etiqueta>
-        <Segmento etiqueta="Duración por defecto" opciones={DURACIONES} valor={DURACIONES.some((o) => o.v === f.default_minutes) ? f.default_minutes : null} onCambio={(v) => p({ default_minutes: v })} testid="aj-min" />
+        <Segmento etiqueta="Duración por defecto" opciones={DURACIONES.some((o) => o.v === f.default_minutes) ? DURACIONES : [...DURACIONES, { v: f.default_minutes, t: `${f.default_minutes} min` }]} valor={f.default_minutes} onCambio={(v) => p({ default_minutes: v })} testid="aj-min" />
         <Etiqueta>Modalidad por defecto</Etiqueta>
         <Segmento etiqueta="Modalidad por defecto" opciones={[{ v: "normal", t: "Normal" }, { v: "superseries", t: "Superseries" }]} valor={f.default_mode} onCambio={(v) => p({ default_mode: v })} testid="aj-modo" />
       </section>

@@ -347,7 +347,7 @@ function Plan({ blocks, hechas, series, ej, actualId, onElegir, onCorregir, inte
                     </button>
                     <div className="flex flex-col items-end gap-1.5">
                       <div className="flex flex-wrap justify-end gap-1">
-                        {Array.from({ length: Math.max(it.sets, h) }).map((_, k) => {
+                        {Array.from({ length: omit ? ss.length : Math.max(it.sets, h) }).map((_, k) => {
                           const se = ss[k];
                           return (
                             <button key={k} type="button" disabled={!se} onClick={() => se && onCorregir(se)} aria-label={se ? `Corregir serie ${k + 1}` : `Serie ${k + 1} pendiente`}

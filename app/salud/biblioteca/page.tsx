@@ -68,7 +68,7 @@ export default function BibliotecaPage() {
       </form>
       {resultados ? (
         <section className="mb-8" data-testid="bib-resultados">
-          <Etiqueta className="mb-2">{resultados.length ? `${resultados.length} pasajes encontrados` : "Resultados"}</Etiqueta>
+          <Etiqueta className="mb-2">{resultados.length ? `${resultados.length} pasaje${resultados.length > 1 ? "s" : ""} encontrado${resultados.length > 1 ? "s" : ""}` : "Resultados"}</Etiqueta>
           {!resultados.length ? <Vacio titulo={`Nada sobre «${q}»`}>Sólo se busca en los libros que ya están listos. Prueba con otras palabras.</Vacio> : null}
           <ul className="grid gap-3 lg:grid-cols-2">
             {resultados.map((r) => (
@@ -85,9 +85,9 @@ export default function BibliotecaPage() {
         </section>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section>
-          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin] md:flex-wrap md:overflow-visible">
             <Chip activo={tema === null} onClick={() => setTema(null)} className="shrink-0">Todos</Chip>
             {Object.entries(B.TEMAS).map(([k, v]) => <Chip key={k} activo={tema === k} onClick={() => setTema(tema === k ? null : k)} className="shrink-0" data-testid={`bib-tema-${k}`}>{v}</Chip>)}
           </div>
@@ -175,7 +175,7 @@ function FichaLibro({ libro, url, onCambio, onCerrar }: { libro: Libro; url?: st
         <div className="space-y-1.5">
           <p className="text-[20px] font-extrabold leading-tight">{libro.title}</p>
           <p className="text-[15px] font-semibold text-tinta2">{libro.author || "Autor sin indicar"}{libro.year ? ` · ${libro.year}` : ""}{libro.edition ? ` · ${libro.edition}` : ""}</p>
-          <p className="text-sm text-tinta2">{libro.format.toUpperCase()} · {tam(libro.file_size)}{libro.pages ? ` · ${libro.pages} páginas` : ""}{libro.chapters ? ` · ${libro.chapters} capítulos` : ""}</p>
+          <p className="text-sm text-tinta2">{libro.format.toUpperCase()} · {tam(libro.file_size)}{libro.pages ? ` · ${libro.pages} página${libro.pages > 1 ? "s" : ""}` : ""}{libro.chapters ? ` · ${libro.chapters} capítulo${libro.chapters > 1 ? "s" : ""}` : ""}</p>
           <div className="flex flex-wrap gap-1">{libro.topics.map((t) => <span key={t} className="rounded-full bg-superficie2 px-2.5 py-0.5 text-xs font-semibold text-tinta2">{B.TEMAS[t] ?? t}</span>)}</div>
           <p className={cx("inline-flex rounded-full px-3 py-1 text-sm font-semibold", e?.c)} data-testid="bib-estado">{e?.t ?? B.ESTADOS[libro.status]}</p>
           {libro.status_detail && (libro.status === "error" || libro.status === "rechazado") ? <p className="text-sm text-peligro-tinta">{libro.status_detail}</p> : null}

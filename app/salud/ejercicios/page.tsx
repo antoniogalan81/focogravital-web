@@ -31,11 +31,11 @@ export default function EjerciciosPage() {
           <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Buscar: nombre, músculo, máquina…" aria-label="Buscar ejercicio" data-testid="cat-buscar"
             className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-tinta3" />
         </label>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin] md:flex-wrap md:overflow-visible">
           <Chip activo={musc === null} onClick={() => setMusc(null)} className="shrink-0">Todos</Chip>
           {Object.entries(MUSCULOS).filter(([k]) => k !== "otro").map(([k, v]) => <Chip key={k} activo={musc === k} onClick={() => setMusc(musc === k ? null : k)} className="shrink-0" data-testid={`cat-m-${k}`}>{v}</Chip>)}
         </div>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin] md:flex-wrap md:overflow-visible">
           {Object.entries(EQUIPOS).filter(([k]) => k !== "otro").map(([k, v]) => <Chip key={k} activo={equipo === k} onClick={() => setEquipo(equipo === k ? null : k)} className="shrink-0 !min-h-9 !text-sm" data-testid={`cat-e-${k}`}>{v}</Chip>)}
         </div>
       </div>

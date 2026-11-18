@@ -159,18 +159,18 @@ export function Segmento<T extends string | number | null>({ opciones, valor, on
 
 const leer = (t: string) => { const x = t.trim().replace(",", "."); if (x === "") return null; const v = Number(x); return Number.isFinite(v) ? v : undefined; };
 /** − valor + con paso; el valor se escribe directamente (teclado numérico en el móvil). */
-export function Paso({ valor, onCambio, paso = 1, min = 0, max = 999, sufijo, etiqueta, decimales, foco, grande, testid }:
-  { valor: number | null; onCambio: (v: number | null) => void; paso?: number; min?: number; max?: number; sufijo?: string; etiqueta: string; decimales?: boolean; foco?: boolean; grande?: boolean; testid?: string }) {
+export function Paso({ valor, onCambio, paso = 1, min = 0, max = 999, sufijo, etiqueta, decimales, foco, grande, compacto, testid }:
+  { valor: number | null; onCambio: (v: number | null) => void; paso?: number; min?: number; max?: number; sufijo?: string; etiqueta: string; decimales?: boolean; foco?: boolean; grande?: boolean; compacto?: boolean; testid?: string }) {
   const [texto, setTexto] = useState(valor === null ? "" : String(valor).replace(".", ","));
   const [visto, setVisto] = useState(valor);
   if (visto !== valor) { setVisto(valor); if (leer(texto) !== valor) setTexto(valor === null ? "" : String(valor).replace(".", ",")); }
   const fijar = (v: number | null) => onCambio(v === null ? null : Math.min(max, Math.max(min, Math.round(v * 100) / 100)));
   const id = useId();
   const btn = cx("salud-anim grid shrink-0 place-items-center rounded-[12px] active:scale-95 focus-visible:outline-2 focus-visible:outline-acento",
-    grande ? "h-14 w-14" : "h-12 w-12", foco ? "bg-[#1c2740] text-foco-texto hover:bg-[#24314d]" : "bg-superficie2 text-tinta hover:bg-[#e6e9ee]");
+    grande ? "h-14 w-14" : compacto ? "h-11 w-11" : "h-12 w-12", foco ? "bg-[#1c2740] text-foco-texto hover:bg-[#24314d]" : "bg-superficie2 text-tinta hover:bg-[#e6e9ee]");
   return (
     <div className="min-w-0 flex-1">
-      <label htmlFor={id} className={cx("mb-1.5 block text-xs font-bold uppercase tracking-[0.05em]", foco ? "text-foco-sec" : "text-tinta2")}>{etiqueta}</label>
+      <label htmlFor={id} className={cx("mb-1.5 block truncate text-xs font-bold uppercase tracking-[0.05em]", foco ? "text-foco-sec" : "text-tinta2")}>{etiqueta}</label>
       <div className={cx("flex items-center gap-1.5 rounded-[16px] border p-1.5", foco ? "border-foco-linea bg-foco-tarjeta" : "border-linea bg-superficie")}>
         <button type="button" aria-label={`Menos ${etiqueta.toLowerCase()}`} className={btn} onClick={() => fijar((valor ?? 0) - paso)} data-testid={testid && `${testid}-menos`}><Icono n="minus" size={22} /></button>
         <div className="flex min-w-0 flex-1 items-baseline justify-center gap-1">
@@ -178,8 +178,8 @@ export function Paso({ valor, onCambio, paso = 1, min = 0, max = 999, sufijo, et
             onChange={(e) => { setTexto(e.target.value); const v = leer(e.target.value); if (v !== undefined) fijar(v); }}
             onBlur={() => setTexto(valor === null ? "" : String(valor).replace(".", ","))}
             onFocus={(e) => e.target.select()} placeholder="—"
-            className={cx("w-full min-w-0 bg-transparent text-center font-extrabold tabular-nums outline-none", grande ? "text-[34px]" : "text-[26px]", foco ? "text-foco-texto placeholder:text-foco-sec" : "text-tinta placeholder:text-tinta3")} />
-          {sufijo ? <span className={cx("text-sm font-semibold", foco ? "text-foco-sec" : "text-tinta2")}>{sufijo}</span> : null}
+            className={cx("w-full min-w-0 bg-transparent text-center font-extrabold tabular-nums outline-none", grande ? "text-[34px]" : compacto ? "text-[22px]" : "text-[26px]", foco ? "text-foco-texto placeholder:text-foco-sec" : "text-tinta placeholder:text-tinta3")} />
+          {sufijo && !compacto ? <span className={cx("text-sm font-semibold", foco ? "text-foco-sec" : "text-tinta2")}>{sufijo}</span> : null}
         </div>
         <button type="button" aria-label={`Más ${etiqueta.toLowerCase()}`} className={btn} onClick={() => fijar((valor ?? 0) + paso)} data-testid={testid && `${testid}-mas`}><Icono n="plus" size={22} /></button>
       </div>
@@ -358,7 +358,7 @@ export function Marco({ titulo, subtitulo, accion, children }: { titulo: string;
         </div>
         <div className="mx-auto max-w-[1280px] px-4 pb-16 pt-6 md:px-8 md:pt-8">
           <header className="mb-5 flex flex-wrap items-end gap-3 md:mb-7">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-72">
               <h1 className="text-[28px] font-extrabold leading-tight tracking-tight md:text-[34px]">{titulo}</h1>
               {subtitulo ? <div className="mt-1 text-[15px] text-tinta2">{subtitulo}</div> : null}
             </div>

@@ -68,12 +68,12 @@ function Progreso({ prog, an: an0 }: { prog: Prog; an: unknown }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Cifra v={r.sesiones} t={`entrenamientos (${r.completas} completos, ${r.parciales} parciales)`} testid="p-sesiones" />
+        <Cifra v={r.sesiones} t={`entrenamiento${r.sesiones === 1 ? "" : "s"} (${r.completas} complet${r.completas === 1 ? "o" : "os"}, ${r.parciales} parcial${r.parciales === 1 ? "" : "es"})`} testid="p-sesiones" />
         <Cifra v={String(r.por_semana).replace(".", ",")} t="por semana" />
         <Cifra v={prog.total_series} t="series hechas" />
         <Cifra v={r.minutos_medios ?? "—"} t="minutos de media" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Tarjeta>
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <label className="min-w-0 flex-1">
@@ -84,7 +84,7 @@ function Progreso({ prog, an: an0 }: { prog: Prog; an: unknown }) {
               </select>
             </label>
           </div>
-          <div className="mb-3"><Segmento etiqueta="Medida" valor={met} onCambio={setMetrica} testid="p-metrica"
+          <div className="mb-3"><Segmento lleno etiqueta="Medida" valor={met} onCambio={setMetrica} testid="p-metrica"
             opciones={(conPeso ? ["e1rm", "peso_max", "reps_max", "volumen"] as const : ["reps_max"] as const).map((k) => ({ v: k, t: k === "e1rm" ? "1RM estimado" : k === "peso_max" ? "Peso" : k === "reps_max" ? "Reps" : "Carga" }))} /></div>
           <Linea puntos={puntos} titulo={`${sel.nombre} · ${METRICAS[met].t} por día`} unidad={METRICAS[met].u} />
           <p className="mt-2 text-sm text-tinta2">
@@ -98,7 +98,7 @@ function Progreso({ prog, an: an0 }: { prog: Prog; an: unknown }) {
             {prog.ejercicios.map((e) => (
               <li key={e.exercise_id}>
                 <button type="button" onClick={() => setEjSel(e.exercise_id)} className={cx("flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left", e.exercise_id === sel.exercise_id ? "bg-acento-suave" : "hover:bg-superficie2")}>
-                  <span className="min-w-0 flex-1"><span className="block font-semibold leading-snug">{e.nombre}</span><span className="block text-sm text-tinta2">{MUSCULOS[e.musculo] ?? e.musculo} · {e.sesiones} sesiones · último {e.ultimo ? `${num(e.ultimo.peso)}×${e.ultimo.reps}` : "—"}</span></span>
+                  <span className="min-w-0 flex-1"><span className="block font-semibold leading-snug">{e.nombre}</span><span className="block text-sm text-tinta2">{MUSCULOS[e.musculo] ?? e.musculo} · {e.sesiones} {e.sesiones === 1 ? "sesión" : "sesiones"} · último {e.ultimo ? `${num(e.ultimo.peso)}×${e.ultimo.reps}` : "—"}</span></span>
                   {e.mejora_e1rm !== null ? <span className={cx("text-sm font-bold tabular-nums", e.mejora_e1rm >= 0 ? "text-ok-tinta" : "text-peligro-tinta")}>{e.mejora_e1rm >= 0 ? "+" : ""}{num(e.mejora_e1rm)}</span> : null}
                 </button>
               </li>
@@ -107,7 +107,7 @@ function Progreso({ prog, an: an0 }: { prog: Prog; an: unknown }) {
         </Tarjeta>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Tarjeta><Barras titulo="Carga por semana (kg × reps)" unidad="kg" puntos={prog.semanas.map((w) => ({ k: diaCorto(w.semana), v: w.volumen, detalle: `${w.series} series · ${w.sesiones} sesiones` }))} /></Tarjeta>
+        <Tarjeta><Barras titulo="Carga por semana (kg × reps)" unidad="kg" puntos={prog.semanas.map((w) => ({ k: diaCorto(w.semana), v: w.volumen, detalle: `${w.series} series · ${w.sesiones} ${w.sesiones === 1 ? "sesión" : "sesiones"}` }))} /></Tarjeta>
         <Tarjeta><Barras titulo="Entrenamientos por semana" unidad="ses." puntos={prog.semanas.map((w) => ({ k: diaCorto(w.semana), v: w.sesiones, detalle: `${w.series} series` }))} /></Tarjeta>
       </div>
       <Tarjeta>

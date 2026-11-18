@@ -107,7 +107,7 @@ export default function InicioSalud() {
     const res = M.resultadoSesion(sesion.plan, D.hechasDe(series, sesion.id), datos.ajustes);
     return (
       <Marco titulo="GYM" accion={accion}>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
           <Tarjeta className="border-2 border-acento" data-testid="gym-en-curso">
             <Etiqueta className="text-acento-tinta">{sesion.status === "pausada" ? "En pausa" : "Entrenamiento en curso"}</Etiqueta>
             <p className="mt-1 text-[28px] font-extrabold leading-tight">{sesion.routine_name}</p>
@@ -131,7 +131,7 @@ export default function InicioSalud() {
 
   return (
     <Marco titulo="GYM" subtitulo={sig ? <span>{sig.motivo}</span> : null} accion={accion}>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
         <div className="space-y-3">
           <Tarjeta className="p-5 sm:p-6" data-testid="gym-siguiente">
             <Etiqueta className="text-acento-tinta">{eleccion.rutina ? "Elegida ahora" : usaPreparada ? `Preparada por ${prep!.by === "mama" ? "MAMA" : "ti"}` : "Te toca"}</Etiqueta>
@@ -178,7 +178,7 @@ export default function InicioSalud() {
                 <ListaPlan blocks={plan.blocks} datos={datos} />
               </>
             ) : null}
-            <div className="sticky bottom-3 z-10 mt-5 rounded-[18px] bg-superficie/90 pt-1 backdrop-blur">
+            <div className="sticky bottom-3 z-10 mt-5 rounded-[18px] bg-superficie/90 pt-1 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
               <Boton grande icono="play" className="w-full" data-testid="gym-empezar" disabled={!plan || !plan.blocks.length} onClick={() => {
                 if (!plan) return;
                 empezar({ rutina_id: rutinaId, minutos, modo, plan: { blocks: plan.blocks, cambios: plan.cambios, adaptacion_pecho: plan.adaptacion_pecho } });

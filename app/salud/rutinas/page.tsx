@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import * as D from "@/src/salud/gym/datos.js";
 import * as M from "@/src/salud/gym/motor.js";
-import { conDatos, useGym, vigilar, type Bloque, type Ejercicio, type Item, type Rutina } from "@/src/salud/store";
+import { conDatos, get as estadoGym, useGym, vigilar, type Bloque, type Ejercicio, type Item, type Rutina } from "@/src/salud/store";
 import { Boton, Cargando, Chip, cx, Etiqueta, Icono, Marco, Mini, MUSCULOS, Paso, SelectorEjercicio, Tarjeta, Vacio } from "@/src/salud/ui";
 
 const PRIORIDAD = { 1: "Principal", 2: "Normal", 3: "Accesorio" } as const;
@@ -122,7 +122,7 @@ function Editor({ rutina, onSalir }: { rutina: Rutina | null; onSalir: () => voi
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const op = (o: Record<string, unknown>) => {
-    try { setBlocks(M.aplicarOp({ blocks }, o, { ej, hechas: {}, ajustes: { descanso: datos?.ajustes?.rest_default, descansoSuperserie: datos?.ajustes?.rest_superset } }).plan.blocks); setMsg(null); }
+    try { setBlocks(M.aplicarOp({ blocks }, o, { ej: estadoGym().datos?.ej ?? ej, hechas: {}, ajustes: { descanso: datos?.ajustes?.rest_default, descansoSuperserie: datos?.ajustes?.rest_superset } }).plan.blocks); setMsg(null); }
     catch (e) { setMsg(err(e)); }
   };
   const editar = (item_id: string, c: Record<string, unknown>) => op({ tipo: "editar", item_id, ...c });
@@ -160,7 +160,7 @@ function Editor({ rutina, onSalir }: { rutina: Rutina | null; onSalir: () => voi
 
   return (
     <Marco titulo={rutina ? "Editar rutina" : "Nueva rutina"} accion={<Boton tipo="secundario" icono="arrow-left" onClick={onSalir}>Rutinas</Boton>}>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
         <div className="space-y-3 lg:order-1">
           <div className="lg:hidden">{resumen}</div>
           {!blocks.length ? <Vacio titulo="Sin ejercicios">Añade el primero con el botón de abajo.</Vacio> : null}
@@ -188,11 +188,11 @@ function Editor({ rutina, onSalir }: { rutina: Rutina | null; onSalir: () => voi
                         <button type="button" aria-label="Quitar" data-testid={`ed-quitar-${e?.slug}`} onClick={() => op({ tipo: "quitar", item_id: it.id, borrar: true })} className="grid h-10 w-10 place-items-center rounded-full text-peligro-tinta hover:bg-peligro-suave"><Icono n="trash" /></button>
                       </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Paso etiqueta="Series" valor={it.sets} min={1} max={20} onCambio={(v) => editar(it.id, { sets: v ?? 1 })} testid={`ed-series-${e?.slug}`} />
-                      <Paso etiqueta="Repeticiones" valor={it.reps} min={1} max={100} onCambio={(v) => editar(it.id, { reps: v ?? 1 })} testid={`ed-reps-${e?.slug}`} />
-                      <Paso etiqueta="Peso orientativo" valor={it.weight} paso={2.5} sufijo="kg" decimales max={1000} onCambio={(v) => editar(it.id, { weight: v })} />
-                      <Paso etiqueta={b.kind === "superset" ? "Descanso por vuelta" : "Descanso"} valor={b.kind === "superset" ? b.rest_round ?? 90 : it.rest} paso={15} max={600} sufijo="s" onCambio={(v) => editar(it.id, { rest: v ?? 90 })} />
+                    <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-3 sm:gap-3">
+                      <Paso compacto etiqueta="Series" valor={it.sets} min={1} max={20} onCambio={(v) => editar(it.id, { sets: v ?? 1 })} testid={`ed-series-${e?.slug}`} />
+                      <Paso compacto etiqueta="Repeticiones" valor={it.reps} min={1} max={100} onCambio={(v) => editar(it.id, { reps: v ?? 1 })} testid={`ed-reps-${e?.slug}`} />
+                      <Paso compacto etiqueta="Peso (kg)" valor={it.weight} paso={2.5} sufijo="kg" decimales max={1000} onCambio={(v) => editar(it.id, { weight: v })} />
+                      <Paso compacto etiqueta={b.kind === "superset" ? "Descanso/vuelta (s)" : "Descanso (s)"} valor={b.kind === "superset" ? b.rest_round ?? 90 : it.rest} paso={15} max={600} sufijo="s" onCambio={(v) => editar(it.id, { rest: v ?? 90 })} />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {([1, 2, 3] as const).map((p) => <Chip key={p} activo={it.priority === p} onClick={() => editar(it.id, { priority: p })}>{PRIORIDAD[p]}</Chip>)}
