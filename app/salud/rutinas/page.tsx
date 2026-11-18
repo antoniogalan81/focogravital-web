@@ -177,7 +177,7 @@ function Editor({ rutina, onSalir }: { rutina: Rutina | null; onSalir: () => voi
                 return (
                   <Tarjeta key={it.id} data-testid={`ed-${e?.slug ?? it.id}`}>
                     <div className="flex items-start gap-3">
-                      <Mini e={e} className="h-16 w-9 shrink-0" />
+                      <Mini e={e} className="h-16 w-16 shrink-0" />
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSust(it.id)}>
                         <span className="block text-[17px] font-bold leading-snug">{e?.name ?? "Ejercicio"}</span>
                         <span className="block text-sm text-tinta2">{MUSCULOS[e?.primary_muscle ?? ""] ?? ""} · toca para cambiar de ejercicio</span>

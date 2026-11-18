@@ -45,7 +45,7 @@ export default function EjerciciosPage() {
           <li key={x.id}>
             <button type="button" onClick={() => setAbierto(x.id)} data-testid={`cat-${x.slug}`}
               className="salud-anim flex h-full w-full flex-col items-center gap-2 rounded-[20px] border border-linea bg-superficie p-3 text-center hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(16,24,40,0.25)]">
-              <Mini e={x} className="h-28 w-14" />
+              <Mini e={x} className="h-28 w-28" />
               <span className="text-[15px] font-semibold leading-snug">{x.name}</span>
               <span className="text-xs text-tinta2">{MUSCULOS[x.primary_muscle] ?? x.primary_muscle} · {EQUIPOS[x.equipment] ?? x.equipment}{x.user_id ? " · tuyo" : ""}</span>
             </button>
@@ -103,7 +103,7 @@ function Ficha({ e, datos, onAbrir }: { e: Ejercicio; datos: Datos; onAbrir: (id
             {alts.map((a) => (
               <li key={a.id}>
                 <button type="button" onClick={() => onAbrir(a.id)} className="flex min-h-14 w-full items-center gap-3 rounded-[14px] border border-linea px-3 py-2 text-left hover:bg-superficie2">
-                  <Mini e={a} className="h-12 w-7 shrink-0" />
+                  <Mini e={a} className="h-12 w-12 shrink-0" />
                   <span className="min-w-0 flex-1"><span className="block font-semibold leading-snug">{a.name}</span><span className="block text-sm text-tinta2">{EQUIPOS[a.equipment] ?? a.equipment}</span></span>
                 </button>
               </li>

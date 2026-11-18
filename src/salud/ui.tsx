@@ -77,22 +77,22 @@ export function Icono({ n, size = 20, className }: { n: string; size?: number; c
 
 // ---------------------------------------------------------------- figura anatómica
 
-export function Figura({ principal, secundarios = [], vista, foco = false, className, titulo }:
-  { principal: string; secundarios?: string[]; vista?: "frente" | "espalda"; foco?: boolean; className?: string; titulo?: string }) {
+export function Figura({ principal, secundarios = [], vista, foco = false, className, titulo, recorte }:
+  { principal: string; secundarios?: string[]; vista?: "frente" | "espalda"; foco?: boolean; className?: string; titulo?: string; recorte?: boolean }) {
   const f = F.figura(principal, secundarios, vista);
   const ac = foco ? "#4F8BFF" : "#2563EB";
   return (
-    <svg viewBox="0 0 100 200" className={className} role="img" aria-label={titulo ?? `${MUSCULOS[principal] ?? principal} · vista de ${f.vista}`}>
+    <svg viewBox={recorte ? F.encuadre(principal).join(" ") : "0 0 100 200"} className={className} role="img" aria-label={titulo ?? `${MUSCULOS[principal] ?? principal} · vista de ${f.vista}`}>
       {f.silueta.map((d, i) => <path key={`s${i}`} d={d} fill={foco ? "#243045" : "#E4E7EC"} />)}
       {f.secundarios.map((d, i) => <path key={`b${i}`} d={d} fill={ac} fillOpacity={0.32} />)}
       {f.principal.map((d, i) => <path key={`p${i}`} d={d} fill={ac} />)}
     </svg>
   );
 }
-/** Miniatura del ejercicio: figura en la vista de su músculo principal. */
-export function Mini({ e, foco, className = "h-14 w-8" }: { e?: Ejercicio | null; foco?: boolean; className?: string }) {
+/** Miniatura del ejercicio: figura en la vista de su músculo principal, encuadrada en la zona que trabaja. */
+export function Mini({ e, foco, className = "h-12 w-12" }: { e?: Ejercicio | null; foco?: boolean; className?: string }) {
   if (!e) return <span className={className} />;
-  return <Figura principal={e.primary_muscle} secundarios={e.secondary_muscles} foco={foco} className={className} />;
+  return <Figura recorte principal={e.primary_muscle} secundarios={e.secondary_muscles} foco={foco} className={cx("rounded-[12px]", foco ? "bg-[#1c2740]" : "bg-superficie2", className)} />;
 }
 
 // ---------------------------------------------------------------- controles
@@ -234,7 +234,7 @@ export function Hoja({ abierta, onCerrar, titulo, children, foco, ancha, testid 
 export function Toast({ texto, onDeshacer, foco }: { texto: string; onDeshacer?: () => void; foco?: boolean }) {
   return (
     <div role="status" aria-live="polite" data-testid="toast"
-      className={cx("fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-xl items-center gap-3 rounded-2xl px-4 py-3 shadow-xl md:bottom-8",
+      className={cx("fixed inset-x-4 bottom-28 z-40 mx-auto flex max-w-xl items-center gap-3 rounded-2xl px-4 py-3 shadow-xl lg:bottom-8",
         foco ? "bg-[#F2F4F7] text-tinta" : "bg-tinta text-white")}>
       <span className="flex-1 text-[15px]">{texto}</span>
       {onDeshacer ? <button type="button" onClick={onDeshacer} data-testid="toast-deshacer" className={cx("min-h-10 rounded-full px-3 text-sm font-bold", foco ? "text-acento-tinta" : "text-[#93B4FF]")}>Deshacer</button> : null}
@@ -310,7 +310,7 @@ export function SelectorEjercicio({ abierta, onCerrar, ej, onElegir, sugeridos =
               <li key={x.id}>
                 <button type="button" data-testid={`ej-${x.slug}`} onClick={() => onElegir(x)}
                   className={cx("salud-anim flex min-h-16 w-full items-center gap-3 rounded-[14px] border px-3 py-2 text-left", foco ? "border-foco-linea bg-foco-tarjeta hover:bg-[#1c2740]" : "border-linea bg-superficie hover:bg-superficie2")}>
-                  <Mini e={x} foco={foco} className="h-12 w-7 shrink-0" />
+                  <Mini e={x} foco={foco} className="h-12 w-12 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold leading-snug">{x.name}{esSug ? <span className={cx("ml-2 rounded-full px-2 py-0.5 text-xs font-bold", foco ? "bg-foco-acento/20 text-foco-acento" : "bg-acento-suave text-acento-tinta")}>sugerido</span> : null}</span>
                     <span className={cx("block text-sm", sec)}>{MUSCULOS[x.primary_muscle] || x.primary_muscle} · {EQUIPOS[x.equipment] || x.equipment}{x.user_id ? " · tuyo" : ""}</span>

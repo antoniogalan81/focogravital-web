@@ -587,7 +587,11 @@ export function siguiente({ ajustes = {}, rutinas = [], sesiones = [], sets = []
   const ultimoMusculo = {};
   for (const s of sets || []) { if (s.deleted_at) continue; const m = musc(ej, s.exercise_id); const t = Date.parse(s.done_at || 0); if (m && t > (ultimoMusculo[m] || 0)) ultimoMusculo[m] = t; }
   const musculos = [...new Set(itemsDe(normalizar(porId[rutina_id]?.blocks || [])).filter((it) => it.priority === 1).map((it) => musc(ej, it.exercise_id)).filter(Boolean))];
-  for (const m of musculos) if (ultimoMusculo[m] && ahora - ultimoMusculo[m] < 2 * UN_DIA) avisos.push(`${m} entrenado hace ${Math.round((ahora - ultimoMusculo[m]) / 3_600_000)} h: recupera o baja la carga`);
+  for (const m of musculos) {
+    if (!ultimoMusculo[m] || ahora - ultimoMusculo[m] >= 2 * UN_DIA) continue;
+    const h = Math.round((ahora - ultimoMusculo[m]) / 3_600_000);
+    avisos.push(`${m.charAt(0).toUpperCase()}${m.slice(1)} entrenado ${h < 1 ? 'hace menos de una hora' : `hace ${h} h`}: dale tiempo a recuperar o baja la carga`);
+  }
   return { rutina_id, rotacion_id: rot, motivo, pecho, avisos, orden };
 }
 

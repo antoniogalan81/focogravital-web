@@ -66,3 +66,10 @@ export function figura(principal, secundarios = [], vista = vistaDe(principal)) 
     secundarios: [...new Set(secundarios || [])].filter((m) => m !== principal).flatMap((m) => R[m] || []),
   };
 }
+
+/** Encuadre [x, y, ancho, alto] de la zona del músculo, para miniaturas legibles (tronco, piernas o cuerpo entero). */
+export function encuadre(musculo) {
+  if (['piernas', 'gluteos', 'gemelos'].includes(musculo)) return [14, 88, 72, 108];
+  if (['pecho', 'espalda', 'hombros', 'biceps', 'triceps', 'antebrazo', 'abdomen'].includes(musculo)) return [14, 24, 72, 80];
+  return [0, 0, 100, 200];
+}

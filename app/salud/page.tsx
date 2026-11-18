@@ -214,7 +214,7 @@ function ListaPlan({ blocks, datos }: { blocks: Bloque[]; datos: Datos }) {
               const e = datos.ej[it.exercise_id];
               return (
                 <li key={it.id} className="flex items-center gap-3 rounded-[14px] border border-linea bg-superficie px-3 py-2">
-                  <Mini e={e} className="h-14 w-8 shrink-0" />
+                  <Mini e={e} className="h-14 w-14 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold leading-snug">{e?.name ?? "Ejercicio"}</p>
                     <p className="text-sm text-tinta2">{MUSCULOS[e?.primary_muscle] ?? ""}{it.priority === 1 ? " · principal" : it.priority === 3 ? " · accesorio" : ""}</p>
