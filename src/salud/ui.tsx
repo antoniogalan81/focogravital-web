@@ -218,7 +218,7 @@ export function Hoja({ abierta, onCerrar, titulo, children, foco, ancha, testid 
       <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-[rgba(11,18,32,0.45)] backdrop-blur-[2px]" onClick={onCerrar} />
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal aria-label={titulo}
         className={cx("relative flex max-h-[88dvh] w-full flex-col rounded-t-[24px] shadow-[0_-12px_40px_rgba(11,18,32,0.25)] outline-none md:rounded-[24px]",
-          ancha ? "md:max-w-3xl" : "md:max-w-lg", foco ? "bg-foco text-foco-texto" : "bg-superficie text-tinta")}>
+          ancha ? "md:max-w-3xl" : "md:max-w-lg", foco ? "border border-foco-linea bg-[#0E1626] text-foco-texto" : "bg-superficie text-tinta")}>
         <div className="flex items-center gap-3 px-5 pb-2 pt-4">
           <h2 className="flex-1 text-lg font-bold">{titulo}</h2>
           <button type="button" aria-label="Cerrar" onClick={onCerrar} data-testid="hoja-cerrar"

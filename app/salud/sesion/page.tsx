@@ -163,7 +163,7 @@ export default function SesionPage() {
 
       <main className="mx-auto grid max-w-[1280px] gap-4 px-4 pb-44 pt-4 md:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-6 lg:pb-12">
         {/* Columna 1: ejercicio actual y registro */}
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="flex flex-wrap gap-2" aria-label="Acciones de la sesión">
             <Chip foco icono="watch" onClick={() => setHoja("tiempo")} data-testid="me-quedan">Me quedan…</Chip>
             <Chip foco icono="layers" onClick={() => intentar(() => operar({ tipo: "modo", modo: sesion.mode === "superseries" ? "normal" : "superseries" }))} data-testid="modo">
@@ -171,6 +171,7 @@ export default function SesionPage() {
             <Chip foco icono={pausada ? "play" : "pause"} onClick={() => { pausar(!pausada); if (!pausada) R.pausarDescanso(); }} data-testid="pausa">{pausada ? "Reanudar" : "Pausar"}</Chip>
             <Chip foco icono="flag" onClick={() => setHoja("fin")} data-testid="terminar" className="!text-[#FDA29B]">Terminar</Chip>
           </div>
+          <div className="lg:hidden"><TarjetaDescanso d={descanso} ahora={ahora} oculto /></div>
           {actual ? (
             <section className="rounded-[20px] border border-foco-linea bg-foco-tarjeta p-4 sm:p-5" data-testid="actual">
               {bloqueActual?.kind === "superset" ? <p className="mb-2 text-xs font-bold uppercase tracking-[0.05em] text-foco-acento">Superserie · {bloqueActual.items.map((it) => nombre(it.exercise_id)).join(" + ")}</p> : null}
@@ -229,7 +230,7 @@ export default function SesionPage() {
 
         {/* Columna 2: descanso y plan completo */}
         <div className="space-y-4">
-          <TarjetaDescanso d={descanso} ahora={ahora} />
+          <div className="hidden lg:block"><TarjetaDescanso d={descanso} ahora={ahora} /></div>
           <Plan blocks={blocks} hechas={hechas} series={series} ej={ej} actualId={actual?.id ?? null}
             onElegir={setElegido} onCorregir={(s) => { setCorrigiendo(s); setHoja("corregir"); }} intentar={intentar} />
           <div className="flex flex-wrap gap-2">
@@ -293,9 +294,10 @@ function Foco({ children }: { children: React.ReactNode }) {
   return <div className="salud min-h-screen bg-foco text-foco-texto [color-scheme:dark]">{children}</div>;
 }
 
-function TarjetaDescanso({ d, ahora }: { d: R.Descanso; ahora: number }) {
+function TarjetaDescanso({ d, ahora, oculto }: { d: R.Descanso; ahora: number; oculto?: boolean }) {
   const activo = d.hasta !== null || d.pausadoQueda !== null;
   if (!activo) {
+    if (oculto) return null; // en el móvil sólo aparece cuando hay descanso
     return (
       <section className="rounded-[20px] border border-foco-linea bg-foco-tarjeta px-4 py-3 text-sm text-foco-sec" data-testid="descanso-inactivo">
         <span className="flex items-center gap-2"><Icono n="clock" size={18} />El descanso empieza solo al terminar cada serie.</span>
