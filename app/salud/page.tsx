@@ -43,7 +43,7 @@ export default function InicioSalud() {
   const prep = datos?.ajustes?.prepared && datos.ajustes.prepared.dia === hoy ? datos.ajustes.prepared : null;
   const rutinaId: string | null = eleccion.rutina ?? prep?.routine_id ?? sig?.rutina_id ?? null;
   const dePrep = !!prep && prep.routine_id === rutinaId;
-  const minutos = eleccion.minutos !== undefined ? eleccion.minutos : dePrep ? prep!.minutes : datos?.ajustes?.default_minutes ?? null;
+  const minutos = eleccion.minutos !== undefined ? eleccion.minutos : dePrep ? prep!.minutes : null; // como en Android: abre con la rutina completa; el tiempo se elige con un toque
   const modo = eleccion.modo ?? (dePrep ? prep!.mode : datos?.ajustes?.default_mode) ?? "normal";
   const pecho = eleccion.pecho ?? (dePrep ? !!prep!.adaptacion_pecho : false);
   const usaPreparada = dePrep && prep!.minutes === minutos && prep!.mode === modo && !!prep!.adaptacion_pecho === pecho;
