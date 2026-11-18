@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "type": "apk",
-  "message": "Nueva versión 1.2.9: vuelve el botón «IA» original y las tareas del móvil se sincronizan con Mama. Se instala encima: no desinstales la app.",
+  "message": "Nueva versión 1.3.0: nueva sección Salud con GYM (rutinas rotativas, adaptación por tiempo, superseries, descansos y progreso; también desde MAMA). Se instala encima: no desinstales la app.",
   "apkUrl": "https://focogravital.com/focogravital.apk",
-  "latestVersion": "1.2.9"
+  "latestVersion": "1.3.0"
 }
