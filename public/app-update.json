@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "type": "apk",
-  "message": "Nueva versión 1.4.0: GYM renovado (diseño nuevo, figura e instrucciones de cada ejercicio, análisis de tu progreso) y Biblioteca de Salud para tus libros, que MAMA consulta y cita. Se instala encima: no desinstales la app.",
+  "message": "Nueva versión 1.4.1: correcciones de estabilidad; la pantalla de bienvenida se ve completa en móviles pequeños. Se instala encima: no desinstales la app.",
   "apkUrl": "https://focogravital.com/focogravital.apk",
-  "latestVersion": "1.4.0"
+  "latestVersion": "1.4.1"
 }

@@ -10,7 +10,7 @@
  * ahí. Así el enlace publicado no cambia cuando cambia la versión.
  *
  * Todos los valores están tomados del propio artefacto compilado por EAS
- * (build 35, APK local firmada con la keystore de EAS, Salud: GYM 2.0), no de la configuración del proyecto.
+ * (build 36, APK local firmada con la keystore de EAS, estabilización), no de la configuración del proyecto.
  */
 
 /**
@@ -21,20 +21,20 @@ export const ANDROID_DOWNLOAD_PATH = "/focogravital.apk";
 
 /** Asset real del release de GitHub al que redirige la ruta estable. */
 export const ANDROID_RELEASE_URL =
-  "https://github.com/antoniogalan81/focogravital-web/releases/download/v1.4.0/focogravital.apk";
+  "https://github.com/antoniogalan81/focogravital-web/releases/download/v1.4.1/focogravital.apk";
 
 export const ANDROID_RELEASE = {
   appName: "Focogravital",
-  versionName: "1.4.0",
-  versionCode: 35,
+  versionName: "1.4.1",
+  versionCode: 36,
   applicationId: "com.agalansevilla.Ingravitalapp",
   /** Fecha de publicación del release. */
   publishedAt: "2026-11-18",
   /** Tamaño real del archivo, en bytes. */
-  sizeBytes: 127_745_258,
+  sizeBytes: 127_724_781,
   /** minSdkVersion 24. */
   minAndroid: "7.0",
-  sha256: "efd18adcbb4cb0e77923bae5448ce95d51f42b41c5b0ac7628289e66d1c9e73e",
+  sha256: "d5bfac70ae19582074433513cc62dba4233ecfd8ddaa10e4165f16098db2b00e",
 } as const;
 
 /** Tamaño legible, redondeado a una decimal (p. ej. «120,8 MB»). */
