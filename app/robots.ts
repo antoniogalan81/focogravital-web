@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Zonas privadas o sin valor para buscadores.
-      disallow: ["/api/", "/account", "/auth/", "/test-supabase"],
+      disallow: ["/api/", "/account", "/auth/"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,

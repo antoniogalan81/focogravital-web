@@ -12,6 +12,7 @@ export default function CookieBanner() {
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage sólo existe en el cliente; leerlo tras montar evita el desajuste de hidratación SSR
     if (!saved) setVisible(true);
   }, []);
 

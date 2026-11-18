@@ -33,6 +33,7 @@ export function useGlobalUi(userId: string | null | undefined) {
     if (prevKeyRef.current === key && hydrated.current) return;
     prevKeyRef.current = key;
     hydrated.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- rehidrata desde localStorage cuando cambia el usuario (almacenamiento externo, sólo cliente)
     setState(readGlobalUi(userId));
   }, [userId]);
 

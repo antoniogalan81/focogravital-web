@@ -69,7 +69,12 @@ export default function MultiItemsInline({
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-  useEffect(() => setDraft(""), [parentTaskId]);
+  // Vaciar el borrador al cambiar de tarea padre (ajuste durante el render, sin efecto en cascada).
+  const [draftParent, setDraftParent] = useState(parentTaskId);
+  if (draftParent !== parentTaskId) {
+    setDraftParent(parentTaskId);
+    setDraft("");
+  }
 
   // Focus + select cuando se abre el editor
   useEffect(() => {

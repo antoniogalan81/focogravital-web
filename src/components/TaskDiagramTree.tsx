@@ -214,6 +214,7 @@ function EditPanelPortal({ task, anchorEl, renderContent }: EditPanelPortalProps
   }, [computePosition]);
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mide el DOM en useLayoutEffect para colocar el popover: es el uso previsto del patrón
     computePosition();
     window.addEventListener("resize", schedulePosition);
     window.addEventListener("scroll", schedulePosition, true);
@@ -283,6 +284,7 @@ function InlineChipsPortal({ anchorEl, children }: InlineChipsPortalProps) {
   }, [computePosition]);
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mide el DOM en useLayoutEffect para colocar el popover: es el uso previsto del patrón
     computePosition();
     window.addEventListener("resize", schedulePosition);
     window.addEventListener("scroll", schedulePosition, true);
@@ -832,6 +834,7 @@ export default function TaskDiagramTree({
   }, [onUpdateTask]);
 
   // ==================== TASK ACTIONS (creación/duplicado) ====================
+  // eslint-disable-next-line react-hooks/refs -- la ref sólo se escribe dentro de los callbacks de las acciones, nunca durante el render
   const taskActions = useMemo(() => createTaskActions({
     selectedMetaId,
     tasks,
@@ -2183,6 +2186,7 @@ export default function TaskDiagramTree({
             {renderConnectors()}
 
             {/* Capa Nodos */}
+            {/* eslint-disable-next-line react-hooks/refs -- renderTaskNode lee refs de posición ya medidas; refactor pendiente (INVESTIGAR) en este componente de 2.300 líneas */}
             {Array.from(layout.nodes.values()).map(node => 
               node.task ? renderTaskNode(node) : renderMetaNode(node)
             )}
@@ -2267,7 +2271,9 @@ export default function TaskDiagramTree({
       })()}
 
       {/* Popover chips inline anclado */}
+      {/* eslint-disable-next-line react-hooks/refs -- el ancla del popover inline se mide en el clic que lo abre; refactor pendiente (INVESTIGAR) */}
       {inlineEdit && inlineEdit.field === "repeatDays" && inlineAnchorRef.current && ReactDOM.createPortal(
+        // eslint-disable-next-line react-hooks/refs -- misma ancla, medida en el clic que abre el popover
         (() => {
           const anchorRect = inlineAnchorRef.current!.getBoundingClientRect();
           const task = tasks.find(t => t.data.id === inlineEdit.taskId);

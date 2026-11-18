@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import type { TaskRow, TaskData, TaskExtra, Label, UITaskType, MultiItem, Meta } from "@/src/lib/types";
 import { getUIType, UI_TYPE_MAPPING } from "@/src/lib/types";
 import MetaParentSelector from "@/src/components/MetaParentSelector";
@@ -152,15 +152,17 @@ export default function TaskEditPanel({
 
   // Refs for unmount cleanup (always up-to-date)
   const editingDataRef = useRef(editingData);
-  editingDataRef.current = editingData;
   const taskRef = useRef(task);
-  taskRef.current = task;
   const onUpdateTaskRef = useRef(onUpdateTask);
-  onUpdateTaskRef.current = onUpdateTask;
   const isDraftRef = useRef(isDraft);
-  isDraftRef.current = isDraft;
   const onDiscardDraftRef = useRef(onDiscardDraft);
-  onDiscardDraftRef.current = onDiscardDraft;
+  useLayoutEffect(() => {
+    editingDataRef.current = editingData;
+    taskRef.current = task;
+    onUpdateTaskRef.current = onUpdateTask;
+    isDraftRef.current = isDraft;
+    onDiscardDraftRef.current = onDiscardDraft;
+  });
 
   // Init/re-init when task changes
   useEffect(() => {
@@ -458,7 +460,7 @@ export default function TaskEditPanel({
       setEditingData(prev => {
         const extra = { ...(prev.extra || {}) };
         if (showQuantity && unit !== undefined && quantity !== undefined) {
-          extra.unit = unit as any;
+          extra.unit = unit as TaskExtra["unit"];
           extra.quantity = quantity;
         } else {
           delete extra.unit;
@@ -466,9 +468,9 @@ export default function TaskEditPanel({
         }
         if (physLike && (data.scope === "FISICO" || data.scope === "CRECIMIENTO")) {
           if (showQuantity && unit !== undefined && quantity !== undefined) {
-            (extra as any)[detailsField] = { kind: data.scope, label: normalizeLabelKey(labelForDetails), unit, value: quantity };
+            extra[detailsField] = { kind: data.scope, label: normalizeLabelKey(labelForDetails), unit, value: quantity };
           } else {
-            delete (extra as any)[detailsField];
+            delete extra[detailsField];
           }
         }
         return { ...prev, extra };
@@ -493,12 +495,12 @@ export default function TaskEditPanel({
         if (cfgForLabel.showQuantity === false || isCustom) {
           delete extra.unit;
           delete extra.quantity;
-          delete (extra as any)[detailsField];
+          delete extra[detailsField];
         } else {
-          extra.unit = nextUnit as any;
+          extra.unit = nextUnit as TaskExtra["unit"];
           extra.quantity = nextQty;
           if (physLike && (data.scope === "FISICO" || data.scope === "CRECIMIENTO")) {
-            (extra as any)[detailsField] = { kind: data.scope, label: normalizeLabelKey(labelItem.name), unit: nextUnit, value: nextQty };
+            extra[detailsField] = { kind: data.scope, label: normalizeLabelKey(labelItem.name), unit: nextUnit, value: nextQty };
           }
         }
         return {
@@ -531,7 +533,8 @@ export default function TaskEditPanel({
       if (exists) { setAddingLabel(false); setNewLabelName(""); return; }
       const category = data.scope === "FISICO" ? "phys" : "know";
       const res = await ensureScoringItemExists(category as "phys" | "know", raw, data.points);
-      const newPoints = res && "points" in (res as any) && (res as any).points !== undefined ? (res as any).points : data.points;
+      const resPoints = (res as { points?: number } | null | undefined)?.points;
+      const newPoints = resPoints !== undefined ? resPoints : data.points;
       const newLabel: Label = {
         id: `new-${Date.now()}`,
         name: raw,
@@ -725,7 +728,7 @@ export default function TaskEditPanel({
     const text = multiDraft.trim();
     if (!text) return;
     const newItem: MultiItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: crypto.randomUUID(),
       title: text,
       done: false,
       order: multiItems.length > 0 ? Math.max(...multiItems.map(i => i.order)) + 1000 : 1000,

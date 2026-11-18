@@ -57,7 +57,7 @@ export default function AgendaSidebar({
 
   // Defensivo: metaIds debe ser string[]
   const metaIds = useMemo(() => {
-    const raw = (filters as any)?.metaIds;
+    const raw = (filters as { metaIds?: unknown } | undefined)?.metaIds;
     if (!Array.isArray(raw)) return [];
     return raw.filter((x: unknown): x is string => typeof x === "string");
   }, [filters]);

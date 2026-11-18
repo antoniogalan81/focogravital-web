@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteShell from "@/components/SiteShell";
 
 const PAYPAL_DONATION_URL =
@@ -39,12 +40,12 @@ export default function Agradecimiento() {
           </p>
 
           <div className="mt-10">
-            <a
+            <Link
               href="/"
               className="inline-block rounded-xl bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 hover:shadow-md hover:scale-[1.02] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
             >
               Volver al inicio
-            </a>
+            </Link>
           </div>
         </div>
       </section>

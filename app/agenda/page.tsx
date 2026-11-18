@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { supabase } from "@/src/lib/supabaseClient";
 import type { TaskRow, TaskData, TaskFilters, FilterPreset, AgendaUIState, Meta, Label, MultiItem } from "@/src/lib/types";
 import { DEFAULT_FILTERS, DEFAULT_UI_STATE } from "@/src/lib/types";
@@ -149,7 +150,7 @@ export default function AgendaPage() {
 
   // ID de la meta que TaskDiagramTree debe seleccionar al montar
   const initialSelectedMetaId = useMemo(() => {
-    const raw = (uiState.activeFilters as any)?.metaIds;
+    const raw = (uiState.activeFilters as { metaIds?: unknown } | undefined)?.metaIds;
     const ids: string[] = Array.isArray(raw) ? raw.filter((x: unknown): x is string => typeof x === "string") : [];
     return metasForSidebar.find(m => ids.includes(m.id))?.id ?? null;
   }, [uiState.activeFilters, metasForSidebar]);
@@ -268,7 +269,7 @@ export default function AgendaPage() {
   const goToMetasView = useCallback(() => {
     const currentMetas = metasForSidebarRef.current;
     if (currentMetas.length > 0) {
-      const raw = (uiStateRef.current.activeFilters as any)?.metaIds;
+      const raw = (uiStateRef.current.activeFilters as { metaIds?: unknown } | undefined)?.metaIds;
       const ids: string[] = Array.isArray(raw) ? raw.filter((x: unknown): x is string => typeof x === "string") : [];
       const validIds = ids.filter((id: string) => currentMetas.some(m => m.id === id));
       if (validIds.length === 0) {
@@ -1104,10 +1105,10 @@ export default function AgendaPage() {
       {/* Header */}
       <header className="shrink-0 h-11 border-b border-slate-200 bg-white flex items-center justify-between px-3">
         <div className="flex items-center gap-3">
-          <a href="/" className="flex items-center gap-2 hover:opacity-80 shrink-0">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 shrink-0">
             <img src="/logo.png" alt="" className="w-6 h-6" />
             <span className="hidden sm:inline font-semibold text-sm text-slate-800">Focogravital</span>
-          </a>
+          </Link>
           <span className="hidden sm:inline text-slate-200">|</span>
           {/* Selector de vistas */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5">

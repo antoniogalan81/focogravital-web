@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     if (error) {
       // Unique violation -> OK (ya existe)
-      const code = (error as any).code as string | undefined;
+      const code = (error as { code?: string }).code;
       if (code === "23505") {
         return NextResponse.json({ ok: true, duplicated: true }, { status: 200 });
       }
@@ -55,9 +55,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, id: data?.id }, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
+      { ok: false, error: e instanceof Error ? e.message : "Unknown error" },
       { status: 500 }
     );
   }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteShell from "@/components/SiteShell";
 
 const PAYPAL_DONATION_URL =
@@ -61,12 +62,12 @@ export default function Error() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
             </a>
-            <a
+            <Link
               href="/"
               className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
             >
               Volver al inicio
-            </a>
+            </Link>
             <span className="mt-2 text-xs text-slate-400">
               Gracias por haber querido apoyar el proyecto.
             </span>

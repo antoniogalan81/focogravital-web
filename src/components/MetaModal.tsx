@@ -128,6 +128,7 @@ export default function MetaModal({ isOpen, meta, onClose, onSave, onDelete }: P
   useEffect(() => {
     if (!isOpen) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- rellena el formulario al abrir el modal con la meta recibida (el modal no se desmonta al cerrarse)
     setTitle(meta?.title || "");
     setDescription(meta?.description || "");
 
