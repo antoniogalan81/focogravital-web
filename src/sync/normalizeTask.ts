@@ -256,6 +256,10 @@ export function normalizeTaskForDb(task: TaskData | Partial<TaskData>): Record<s
     normalizedExtra.archivedAt = task.extra.archivedAt;
   }
 
+  // MAMA (T15 A1/A2): extra.mama la escribe SÓLO CEOPadre; la WEB la conserva tal cual, como la APP.
+  const mama = task.extra?.mama;
+  if (mama && typeof mama === "object" && !Array.isArray(mama)) normalizedExtra.mama = mama;
+
   // ==================== BUILD RESULT ====================
   
   const result: Record<string, unknown> = {
@@ -392,6 +396,7 @@ export function hydrateTaskFromDb(dbTask: Record<string, unknown>): TaskData {
   if (typeof dbExtra.archivedAt === "string" && Number.isFinite(Date.parse(dbExtra.archivedAt))) {
     extra.archivedAt = dbExtra.archivedAt;
   }
+  if (dbExtra.mama && typeof dbExtra.mama === "object" && !Array.isArray(dbExtra.mama)) extra.mama = dbExtra.mama;
   // extra.multiItems (legacy: string[] para compatibilidad con TaskEditorContent)
   if (Array.isArray(dbExtra.multiItems) && dbExtra.multiItems.length > 0) {
     extra.multiItems = dbExtra.multiItems as string[];
