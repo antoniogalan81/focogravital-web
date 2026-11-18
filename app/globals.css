@@ -24,3 +24,45 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Salud · GYM — tokens del sistema de diseño (APP/docs/salud/DISENO.md) */
+@theme {
+  --color-lienzo: #F4F5F7;
+  --color-superficie: #FFFFFF;
+  --color-superficie2: #F0F2F5;
+  --color-tinta: #0B1220;
+  --color-tinta2: #475467;
+  --color-tinta3: #98A2B3;
+  --color-linea: rgba(16, 24, 40, 0.08);
+  --color-acento: #2563EB;
+  --color-acento-suave: #EEF4FF;
+  --color-acento-tinta: #1D4ED8;
+  --color-ok: #12B76A;
+  --color-ok-suave: #ECFDF3;
+  --color-ok-tinta: #067647;
+  --color-aviso: #F79009;
+  --color-aviso-suave: #FFFAEB;
+  --color-aviso-tinta: #B54708;
+  --color-peligro: #F04438;
+  --color-peligro-suave: #FEF3F2;
+  --color-peligro-tinta: #B42318;
+  --color-mama: #7A5AF8;
+  --color-mama-suave: #F4F3FF;
+  --color-mama-tinta: #5925DC;
+  --color-foco: #0B1220;
+  --color-foco-tarjeta: #151E2E;
+  --color-foco-linea: rgba(255, 255, 255, 0.08);
+  --color-foco-texto: #F2F4F7;
+  --color-foco-sec: #98A2B3;
+  --color-foco-acento: #4F8BFF;
+  --color-foco-ok: #32D583;
+}
+
+.salud {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.salud-anim { transition: opacity 180ms ease-out, transform 180ms ease-out, background-color 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .salud *, .salud *::before, .salud *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

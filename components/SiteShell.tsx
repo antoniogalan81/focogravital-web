@@ -7,10 +7,12 @@ import { BRAND, CONTACT_EMAIL, WHATSAPP_URL } from "@/src/lib/site";
 
 type Props = {
   children: ReactNode;
-  active?: "home" | "servicios" | "legal" | "agenda" | "metas";
+  active?: "home" | "servicios" | "legal" | "agenda" | "metas" | "salud";
+  /** Sin contenedor ni márgenes: la página pinta su propio fondo y ancho (Salud). */
+  bleed?: boolean;
 };
 
-export default function SiteShell({ children, active }: Props) {
+export default function SiteShell({ children, active, bleed }: Props) {
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900">
       {/* Header */}
@@ -54,6 +56,16 @@ export default function SiteShell({ children, active }: Props) {
                 }`}
               >
                 Metas
+              </Link>
+              <Link
+                href="/salud"
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                  active === "salud"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Salud
               </Link>
             </nav>
 
@@ -101,15 +113,27 @@ export default function SiteShell({ children, active }: Props) {
             >
               Metas
             </Link>
+            <Link
+              href="/salud"
+              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                active === "salud"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 bg-slate-100"
+              }`}
+            >
+              Salud
+            </Link>
           </nav>
         </div>
       </header>
 
       {/* Main content */}
       <main className="flex-1">
-        <div className="mx-auto max-w-[1140px] px-4 sm:px-6 py-8 sm:py-12 md:py-16">
-          {children}
-        </div>
+        {bleed ? children : (
+          <div className="mx-auto max-w-[1140px] px-4 sm:px-6 py-8 sm:py-12 md:py-16">
+            {children}
+          </div>
+        )}
       </main>
 
       {/* Footer */}

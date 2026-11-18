@@ -1132,6 +1132,12 @@ export default function AgendaPage() {
               Metas
             </button>
             <a
+              href="/salud"
+              className="px-2 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors text-slate-500 hover:text-slate-700"
+            >
+              Salud
+            </a>
+            <a
               href="/donaciones"
               className="hidden md:inline px-3 py-1 text-xs font-medium rounded-md transition-colors text-slate-500 hover:text-slate-700"
             >

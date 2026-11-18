@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Copias byte a byte del módulo compartido de Salud (se validan en APP; aquí no se tocan).
+    "src/salud/gym/**",
   ]),
 ]);
 
