@@ -604,7 +604,7 @@ export async function fetchScoringSettings(): Promise<{ data: Label[] | null; er
     .select("data")
     .eq("id", "__APP_SETTINGS__")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.warn("app_settings fetch error:", error.message);
